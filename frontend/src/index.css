@@ -99,10 +99,10 @@
   right: -5px;
 }
 
-/* Zoom controls as a single glass bar beside the minimap. */
+/* Glass styling only. Layout is set on the element in ui.js with `!` utilities: React
+   Flow's own stylesheets are bundled after this file, so plain rules here lose. */
 .react-flow__controls {
   display: flex;
-  flex-direction: row;
   gap: 2px;
   padding: 3px;
   border-radius: 12px;
@@ -124,7 +124,9 @@
   background: rgba(99, 102, 241, 0.1);
   color: #6366f1;
 }
-.react-flow__controls-button svg {
+/* React Flow's own control icons are solid shapes; ours are lucide strokes, which this
+   rule would flood-fill. The stroke attribute is what tells them apart. */
+.react-flow__controls-button svg:not([stroke]) {
   fill: currentColor;
 }
 

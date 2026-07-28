@@ -1,20 +1,25 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import ReactFlow, {
   Background,
   BackgroundVariant,
+  ControlButton,
   Controls,
   MiniMap,
   Panel,
   useReactFlow,
 } from 'reactflow';
 import clsx from 'clsx';
+import { Maximize } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from './store';
 import { useAddNode } from './hooks/useAddNode';
 import { nodeTypes, configByType } from './nodes/registry';
 import { edgeTypes } from './edges/TrimmedEdge';
+import { fitViewport } from './lib/fitViewport';
+import { CONNECTION_LINE, shapeEdges } from './lib/edgeShape';
 import { categoryHex } from './nodes/core/nodeVariants';
 import { DeleteDropZone } from './components/DeleteDropZone';
+import { EdgeShapeToggle } from './components/EdgeShapeToggle';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { FlyingGhost } from './components/FlyingGhost';
 
@@ -22,6 +27,8 @@ import 'reactflow/dist/style.css';
 
 const GRID = 20;
 const HIT_PADDING = 14;
+const MIN_ZOOM = 0.2;
+const MAX_ZOOM = 2;
 const proOptions = { hideAttribution: true };
 const minimapColor = (node) =>
   categoryHex[configByType[node.type]?.category] ?? '#94A3B8';
@@ -46,7 +53,7 @@ const selector = (state) => ({
 });
 
 export const PipelineUI = () => {
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, setViewport, fitView } = useReactFlow();
   const addNode = useAddNode();
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect } = useStore(
     useShallow(selector)
@@ -54,7 +61,12 @@ export const PipelineUI = () => {
   const removeNode = useStore((s) => s.removeNode);
   const removeEdge = useStore((s) => s.removeEdge);
   const setNodePosition = useStore((s) => s.setNodePosition);
+  const edgeShape = useStore((s) => s.edgeShape);
+  const toggleEdgeShape = useStore((s) => s.toggleEdgeShape);
 
+  const shapedEdges = useMemo(() => shapeEdges(edges, edgeShape), [edges, edgeShape]);
+
+  const paneRef = useRef(null);
   const trashRef = useRef(null);
   const origin = useRef(null);
   const [armed, setArmed] = useState(false);
@@ -94,6 +106,17 @@ export const PipelineUI = () => {
     },
     [addNode, screenToFlowPosition]
   );
+
+  // React Flow's own fit uses the whole pane, which tucks nodes under the floating
+  // chrome. This frames them into what is actually visible instead.
+  const fitToFreeSpace = useCallback(() => {
+    const pane = paneRef.current?.getBoundingClientRect();
+    const viewport =
+      pane && fitViewport(nodes, pane, { minZoom: MIN_ZOOM, maxZoom: MAX_ZOOM });
+
+    if (viewport) setViewport(viewport, { duration: 300 });
+    else fitView({ duration: 300 });
+  }, [nodes, setViewport, fitView]);
 
   const onDragOver = useCallback((event) => {
     event.preventDefault();
@@ -168,10 +191,13 @@ export const PipelineUI = () => {
   }, [pending, setNodePosition]);
 
   return (
-    <div className={clsx('relative h-full w-full', armed && 'trash-armed')}>
+    <div
+      ref={paneRef}
+      className={clsx('relative h-full w-full', armed && 'trash-armed')}
+    >
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={shapedEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -184,13 +210,12 @@ export const PipelineUI = () => {
         edgeTypes={edgeTypes}
         proOptions={proOptions}
         snapGrid={[GRID, GRID]}
-        connectionLineType="smoothstep"
+        connectionLineType={CONNECTION_LINE[edgeShape]}
         connectionLineStyle={{ stroke: '#6366F1', strokeWidth: 2 }}
-        defaultEdgeOptions={{ type: 'trimmed' }}
         deleteKeyCode={['Backspace', 'Delete']}
         elevateNodesOnSelect
-        minZoom={0.2}
-        maxZoom={2}
+        minZoom={MIN_ZOOM}
+        maxZoom={MAX_ZOOM}
       >
         <Background
           variant={BackgroundVariant.Dots}
@@ -198,13 +223,7 @@ export const PipelineUI = () => {
           size={1.4}
           color="#C2C8DC"
         />
-        {/* Zoom controls sit beside the minimap; on mobile the minimap is hidden and
-            the controls take the corner themselves. */}
-        <Controls
-          position="bottom-right"
-          showInteractive={false}
-          className="!bottom-4 !right-4 !m-0 sm:!right-[13.25rem]"
-        />
+        {/* overflow-hidden so the map's square svg is clipped to the rounded glass. */}
         <MiniMap
           pannable
           zoomable
@@ -212,14 +231,15 @@ export const PipelineUI = () => {
           nodeStrokeWidth={0}
           style={{ width: 180, height: 120 }}
           maskColor="rgba(244,245,251,0.65)"
-          className="!bottom-4 !right-4 !m-0 !hidden !rounded-xl !border !border-white/70
-                     !bg-white/55 !shadow-glass !backdrop-blur-xl sm:!block"
+          className="!bottom-4 !right-4 !m-0 !hidden !overflow-hidden !rounded-xl !border
+                     !border-white/70 !bg-white/55 !shadow-glass !backdrop-blur-xl sm:!block"
         />
 
-        {/* Sits directly above the zoom bar; only present while a node is in hand. */}
+        {/* One row for every canvas instrument, laid out beside the minimap; on mobile
+            the minimap is hidden and the row takes the corner itself. */}
         <Panel
           position="bottom-right"
-          className="!bottom-[3.75rem] !right-4 !m-0 sm:!right-[13.25rem]"
+          className="!bottom-4 !right-4 !m-0 flex items-end gap-2 sm:!right-[13.25rem]"
         >
           <DeleteDropZone
             ref={trashRef}
@@ -229,6 +249,18 @@ export const PipelineUI = () => {
             title={deleteTitle}
             onClick={deleteSelection}
           />
+          <EdgeShapeToggle shape={edgeShape} onToggle={toggleEdgeShape} />
+          {/* The built-in fit is replaced rather than extended — React Flow runs its own
+              first, which would frame the graph under the chrome and then animate off it. */}
+          <Controls
+            showFitView={false}
+            showInteractive={false}
+            className="!static !m-0 !flex-col"
+          >
+            <ControlButton onClick={fitToFreeSpace} title="fit view" aria-label="fit view">
+              <Maximize size={13} strokeWidth={2.5} />
+            </ControlButton>
+          </Controls>
         </Panel>
       </ReactFlow>
 

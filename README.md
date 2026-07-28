@@ -48,13 +48,20 @@ The frontend targets `http://localhost:8000` by default; override with
 3. Edit fields directly on the card.
 4. Remove things three ways: press <kbd>Delete</kbd> on a selection, **drag a node onto the
    bin** at the bottom-right, or click the bin to delete the selected node. Both bin routes
-   ask for confirmation first.
-5. **Clear all** in the header empties the canvas, also behind a confirmation.
-6. Hit **Submit** to analyse the pipeline.
+   ask for confirmation first; deleting a *connection* doesn't, since it's trivial to redraw.
+5. Switch connections between **straight and curved** with the toggle beside the bin. It
+   re-routes what's already on the canvas, not just new connections.
+6. **Fit view** frames the whole pipeline into the space the floating chrome leaves free,
+   rather than under it.
+7. **Clear all** in the header empties the canvas, also behind a confirmation.
+8. Hit **Submit** to analyse the pipeline.
 
 The bin opens its lid and turns red as a node comes over it, the node shrinks and tilts in
 your hand, and on confirm a card-shaped stand-in arcs into the bin as it gulps. All of it is
 suppressed under `prefers-reduced-motion`.
+
+A fuller tour, with the reasoning behind each behaviour, is in
+[docs/FEATURES.md](docs/FEATURES.md).
 
 ---
 
@@ -111,9 +118,10 @@ asks for a demonstration of the abstraction's flexibility:
 A minimal glassmorphic interface built on a semantic token layer in
 [`tailwind.config.js`](frontend/tailwind.config.js). A fixed three-point radial wash
 (indigo / violet / cyan over a near-white canvas) gives the glass something to refract;
-chrome surfaces — header, node rail, dialogs, minimap, zoom bar, delete bin — share one
-`.glass` recipe of translucent white, a light border and `backdrop-blur-xl`. Accent is an
-indigo→violet gradient, one hue per node category, radii 12–16px.
+chrome surfaces — header, node rail, dialogs, minimap, and the bottom-right instrument row
+(bin, connection-shape toggle, vertical zoom bar) — share one `.glass` recipe of
+translucent white, a light border and `backdrop-blur-xl`. Accent is an indigo→violet
+gradient, one hue per node category, radii 12–16px.
 
 **Node cards deliberately skip `backdrop-blur`.** Each blurred layer is its own compositing
 pass, and a canvas can hold hundreds of nodes; they use translucent white with a soft
@@ -149,6 +157,10 @@ styling, icons, and layout are original; no proprietary assets are used.*
 - `{{variable}}` names create left-hand target handles, in first-appearance order, deduped,
   validated as real JavaScript identifiers (reserved words rejected). Invalid names produce
   an inline warning instead of vanishing silently.
+- **Handle IDs are positional (`in-0`, `in-1`, …), not derived from the variable name.**
+  An ID built from the name turns every rename into a remove-and-recreate, which drops the
+  connection and leaves React Flow with an unmeasured port. Renaming now changes only the
+  label; the wire survives.
 - The parser is a standalone, independently tested utility:
   [`lib/parseVariables.js`](frontend/src/lib/parseVariables.js).
 
@@ -181,7 +193,12 @@ Drag / click  →  useAddNode  →  Zustand store  →  React Flow  →  Submit
 - **`store.js`** — Zustand. All node data is immutable; editing one node leaves every other
   node's object identity intact.
 
-More in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+| Doc | Covers |
+|---|---|
+| [docs/FEATURES.md](docs/FEATURES.md) | Every behaviour in the app and the reasoning behind it |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layout, build setup, data flow, store contract, the API contract |
+| [docs/NODE_ABSTRACTION.md](docs/NODE_ABSTRACTION.md) | The full config schema and how to add a node type |
+| [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | What was optimised, what was measured, what was rejected |
 
 ---
 
@@ -201,19 +218,31 @@ Fixed along the way, listed because they're easy to miss:
 | `llmNode.js` | Handle offsets hand-tuned as `100/3` / `200/3` per node. Now distributed automatically. |
 | `main.py` | A `GET` endpoint declaring a `Form(...)` body — could not work as written. |
 
-One more that neither the brief nor the starter code hints at: **React Flow does not delete
-edges when a handle disappears.** Deleting `{{input}}` from a Text node left a live edge
-pointing at a port that no longer existed, inflating `num_edges` and potentially reporting a
-false cycle. `pruneEdges` in the store fixes it, and it's covered by tests.
+Two more that neither the brief nor the starter code hints at, both in React Flow itself:
+
+**It does not delete edges when a handle disappears.** Deleting `{{input}}` from a Text
+node left a live edge pointing at a port that no longer existed, inflating `num_edges` and
+potentially reporting a false cycle. `pruneEdges` in the store fixes it, and it's covered
+by tests.
+
+**It measures port positions with `getBoundingClientRect()` — which includes CSS
+transforms — but only re-measures on a `ResizeObserver`, which a transform never fires.**
+A port read while its card is mid-animation is therefore recorded in the wrong place, by a
+fraction of the card's own width, and nothing ever corrects it. Since every card runs a
+220 ms entrance scale, this made arrowhead spacing differ per node type and shift as a
+Text node grew — the error is proportional to card width, and the Text node is the only
+one whose width varies. Fixed by re-measuring once a card's transform settles
+([`useMeasureAfterTransform`](frontend/src/hooks/useMeasureAfterTransform.js)) and by
+making port hover a `box-shadow` halo rather than a `scale()`.
 
 ---
 
 ## Tests
 
-100 tests: 79 frontend (Jest + React Testing Library), 21 backend (pytest).
+170 tests: 149 frontend (Jest + React Testing Library), 21 backend (pytest).
 
 ```
-cd frontend && npm run test:ci     # 79 passed
+cd frontend && npm run test:ci     # 149 passed, 14 suites
 cd backend  && pytest -q           # 21 passed
 ```
 
@@ -227,6 +256,15 @@ Highlights:
   when invalid, and — the important one — disappearing *along with their edges*.
 - **`App.test.js`** types into a field and submits with no intervening delay, proving the
   debounce is flushed and the request carries the value just typed, not the previous one.
+- **`nodes/textNode.test.js`** also pins the rename guarantee directly: renaming a variable
+  — longer, shorter, or one of several — must leave the handle IDs and the edge list byte
+  for byte identical.
+- **`lib/fitViewport.test.js`** projects the graph's bounding box through the computed
+  viewport and asserts it clears every inset, rather than asserting the arithmetic it just
+  performed.
+- **`hooks/useMeasureAfterTransform.test.js`** covers the re-measure firing on
+  `animationend`, ignoring transitions that can't move a port, and — the one that matters —
+  refusing to measure a card that is still transformed.
 - **`backend/test_dag.py`** covers empty, single, linear, branching, merging, diamond,
   self-loop, 2-cycle, long cycle, a cycle in one of two disconnected components, duplicate
   edges, edges referencing unknown nodes, and a 10,000-node graph.
@@ -245,7 +283,7 @@ See [docs/PERFORMANCE.md](docs/PERFORMANCE.md). Summary:
   doesn't re-render on every drag frame.
 - `nodeTypes` is built once at module scope; variable parsing and text measurement are cached.
 
-Production bundle: **104.7 kB JS + 5.6 kB CSS**, gzipped.
+Production bundle: **110.6 kB JS + 8.0 kB CSS**, gzipped.
 
 ---
 

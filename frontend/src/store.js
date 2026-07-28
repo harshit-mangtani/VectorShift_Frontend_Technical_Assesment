@@ -6,10 +6,9 @@ import {
   MarkerType,
 } from 'reactflow';
 
+// No `type` here: the shape is a view preference, applied when the edge is rendered so
+// that flipping it re-routes the connections already on the canvas.
 const EDGE_STYLE = {
-  // Custom type: stops short of the target port so the arrowhead is not hidden
-  // beneath the node. See edges/TrimmedEdge.js.
-  type: 'trimmed',
   markerEnd: { type: MarkerType.ArrowClosed, height: 20, width: 20, color: '#8792ad' },
 };
 
@@ -17,6 +16,10 @@ export const useStore = create((set, get) => ({
   nodes: [],
   edges: [],
   nodeIDs: {},
+  edgeShape: 'straight',
+
+  toggleEdgeShape: () =>
+    set({ edgeShape: get().edgeShape === 'straight' ? 'curved' : 'straight' }),
 
   /** Monotonic per type; never reuses a freed number, so IDs stay unique across deletions. */
   getNodeID: (type) => {

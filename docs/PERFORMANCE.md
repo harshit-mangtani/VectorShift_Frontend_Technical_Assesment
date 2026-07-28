@@ -6,11 +6,11 @@ Production build, gzipped:
 
 | Asset | Size |
 |---|---|
-| `main.js` | 104.7 kB |
-| `main.css` | 5.6 kB |
+| `main.js` | 110.6 kB |
+| `main.css` | 8.0 kB |
 
 React Flow accounts for the bulk of the JS. Tailwind's content scanning keeps CSS at
-5.6 kB for a nine-node design system — preflight plus only the utilities actually used.
+8 kB for a nine-node design system — preflight plus only the utilities actually used.
 
 **Not measured here:** React DevTools Profiler traces. Profiling a browser session wasn't
 possible in the environment this was built in, so no before/after render timings are
@@ -64,8 +64,12 @@ second for the duration of a drag. Two consequences, both handled:
   discard and recreate its internals.
 - Edges are **not** animated by default. Each animated edge runs a CSS animation; at scale
   they dominate the frame budget.
-- `useUpdateNodeInternals` fires only when the resolved handle-ID list actually changes,
-  not on every keystroke in a Text node.
+- `useUpdateNodeInternals` fires only when the resolved handle-ID list or the card's
+  declared size actually changes, plus once when a card transform settles — not on every
+  keystroke in a Text node. Because Text-node port IDs are positional rather than derived
+  from the variable name, renaming a variable changes neither, so it costs nothing.
+- The connection shape is applied at render time, but an edge that already carries the
+  right type is passed through by identity, so toggling doesn't invalidate the graph.
 - Autosize writes are `requestAnimationFrame`-throttled.
 
 ## Considered and rejected
@@ -75,5 +79,5 @@ second for the duration of a drag. Two consequences, both handled:
 | Normalising the store to a `Map` | `nodes.map()` is O(n) per update, but debouncing already caps that at ~7 updates/sec. Normalisation adds complexity at every React Flow integration point for no gain at this scale. |
 | `onlyRenderVisibleElements` | A real option and one prop away, but it should be enabled on evidence, not by default — it has trade-offs during fast panning. Left off pending the Scale measurement above. |
 | Redux | Zustand already fits. |
-| Route-level code splitting / lazy MiniMap | Single-route app; the split would cost a waterfall and save nothing meaningful against a 104 kB bundle. |
+| Route-level code splitting / lazy MiniMap | Single-route app; the split would cost a waterfall and save nothing meaningful against a 110 kB bundle. |
 | Windowing the node library | Nine items. |

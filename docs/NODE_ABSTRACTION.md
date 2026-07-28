@@ -90,12 +90,20 @@ just a config:
 
 ```js
 handles: (data) => [
-  ...parseVariables(data.text).variables.map((name) => ({
-    type: 'target', id: name, label: name,
+  ...parseVariables(data.text).variables.map((name, index) => ({
+    type: 'target', id: `in-${index}`, label: name,
   })),
   { type: 'source', id: 'output' },
 ],
 ```
+
+**The ID is a positional slot, deliberately independent of the label.** An ID built from
+the variable name would make every rename a remove-and-recreate: React Flow tears the port
+down, any edge into it is left pointing at nothing, and the replacement port is unmeasured
+until the next observation. Keeping the ID positional means a rename changes `label` and
+nothing else — the connection is untouched and no re-measure is needed. Both the Text and
+Transform nodes work this way, and `textNode.test.js` covers renaming one of several
+variables, renaming to a shorter name, and deleting one entirely.
 
 Because the capability lives in the core rather than in one component, **Transform** picks
 up the same behaviour in three lines, and **Database** uses it for something different —
@@ -108,9 +116,13 @@ handles: (data) =>
     : [target('query'), source('rows')],
 ```
 
-`createNode` watches the resolved handle-ID list. When it changes it calls
-`useUpdateNodeInternals` so React Flow re-measures, then calls `pruneEdges` to delete any
-edge pointing at a port that no longer exists — see below.
+`createNode` watches the resolved handle-ID list, and the card's declared size alongside
+it — a card that resizes moves its right-hand ports just as surely as adding one does.
+When either changes it calls `useUpdateNodeInternals` so React Flow re-measures, then
+calls `pruneEdges` to delete any edge pointing at a port that no longer exists — see below.
+
+Measurement has a third trigger that isn't about config at all: see
+[ARCHITECTURE.md § Port measurement](ARCHITECTURE.md#port-measurement).
 
 ### `render` is an escape hatch
 

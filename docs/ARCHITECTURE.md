@@ -16,13 +16,25 @@ frontend/
     submit.js                 Part 4 submit flow
     components/
       ResultDialog.js         the required alert
+      ConfirmDialog.js        node delete + clear all
+      DeleteDropZone.js       the bin (pointer hit-tested, not HTML5 drop)
+      EdgeShapeToggle.js      straight ↔ curved connections
+      FlyingGhost.js          the arc into the bin
+      ClearAllButton.js       header action
+      LoadingDots.js          submit pending state
+    edges/
+      TrimmedEdge.js          step edge that always meets its target head-on
     hooks/
       useAddNode.js           one creation path for drag and click
       useDebouncedField.js    local-first editing, debounced commit
       useAutosizeHeight.js    textarea height
+      useMeasureAfterTransform.js
+                              re-reads port positions once a card transform settles
     lib/
       parseVariables.js       {{variable}} extraction
       measureText.js          cached canvas text measurement
+      edgeShape.js            applies the connection shape at render time
+      fitViewport.js          fit-view that avoids the floating chrome
       api.js                  payload shaping + fetch
       pendingCommits.js       flush registry for debounced edits
     nodes/
@@ -74,11 +86,30 @@ library click / canvas drop
 | `addNode(node)` | New array; existing node references preserved. |
 | `updateNodeField(id, key, value)` | Returns a new node **and** a new `data` object for the target only. Every other node keeps its identity, which is what makes `React.memo` effective. |
 | `pruneEdges(id, validHandleIds)` | Removes edges bound to handles that no longer exist on that node. No-ops (same array identity) when nothing changes. |
+| `removeNode(id)` | Drops the node and every edge attached to it. |
+| `removeEdge(id)` | Drops one connection. Unconfirmed by design — a connection is cheap to redraw. |
+| `setNodePosition(id, position)` | Puts a node back when a drag-to-delete is cancelled. |
+| `clearAll()` | Empties nodes and edges. |
+| `toggleEdgeShape()` | Flips `edgeShape` between `'straight'` and `'curved'`. A view preference; edges themselves carry no type. |
 | `onNodesChange` / `onEdgesChange` / `onConnect` | Standard React Flow handlers. |
 
 Node components subscribe to their own slice, never to the whole `nodes` array.
 `applyNodeChanges` produces a new array on every mousemove during a drag; a broad
 subscription would re-render at frame rate.
+
+## Port measurement
+
+React Flow caches each port's offset from `getBoundingClientRect()` — which folds in every
+CSS transform on the card — and only re-reads it when a **ResizeObserver** fires. A
+transform never fires one.
+
+So a port measured while its card is mid-animation is recorded in the wrong place, by a
+fraction of the card's own width, and nothing afterwards corrects it. Two rules follow:
+
+- Anything that transforms a card must trigger a re-measure once it settles —
+  `useMeasureAfterTransform`, attached in `BaseNode`.
+- Nothing that is a port, or an ancestor of one, should use `transform` for a hover or
+  state effect where `box-shadow` would do.
 
 ## Frontend ↔ backend contract
 
