@@ -86,4 +86,7 @@ export const textConfig = {
   // Height is left to the content: the field reserves the room its ports need, so the
   // card never has to be padded out beyond what it actually shows.
   size: (data) => ({ width: textWidth(data.text ?? '') }),
+  outputs: [
+    { key: 'output', type: 'Text', description: 'The composed text' },
+  ],
 };

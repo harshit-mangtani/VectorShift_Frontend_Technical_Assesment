@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Play } from 'lucide-react';
 import { useStore } from './store';
 import { parsePipeline } from './lib/api';
@@ -42,10 +43,23 @@ export const SubmitButton = () => {
 
   return (
     <>
+      {/* The graph is read once, at click time. Letting it be edited mid-flight would
+          produce an answer about a pipeline that no longer exists, so the canvas is
+          sealed until the response lands. Portalled to escape any stacking context. */}
+      {pending &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-40 cursor-progress bg-white/25 backdrop-blur-[1px]"
+            aria-hidden="true"
+          />,
+          document.body
+        )}
+
       <button
         type="submit"
         onClick={onSubmit}
         disabled={pending}
+        aria-busy={pending}
         className="inline-flex h-9 items-center gap-2 rounded-xl bg-gradient-to-br from-brand
                    to-cat-llm px-3.5 text-sm font-medium text-white shadow-card
                    transition-all duration-200 hover:shadow-lift hover:brightness-105

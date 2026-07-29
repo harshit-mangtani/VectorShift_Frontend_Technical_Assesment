@@ -16,12 +16,16 @@ export const scoreConfig = {
   icon: Sparkles,
   category: 'logic',
   fields: [
-    { key: 'threshold', type: 'number', label: 'Threshold',
+    { key: 'threshold', type: 'number', label: 'Threshold', required: true,
+      help: 'Rows below this are dropped.',
       defaultValue: 0.5, numeric: { min: 0, max: 1, step: 0.05 } },
   ],
   handles: [
     { type: 'target', id: 'input' },
     { type: 'source', id: 'score' },
+  ],
+  outputs: [
+    { key: 'score', type: 'Decimal', description: 'Confidence, 0–1' },
   ],
 };
 ```
@@ -30,8 +34,9 @@ export const scoreConfig = {
 
 That is the entire process. The node is now registered with React Flow, grouped into the
 toolbar under its category, coloured by its accent, draggable and click-to-addable, seeded
-into `node.data` with its defaults, rendered with labelled and accessible controls, and
-covered by `registry.test.js`.
+into `node.data` with its defaults, rendered with labelled and accessible controls, badged
+with its field types, given its identifier pill and outputs panel, and covered by
+`registry.test.js`.
 
 ---
 
@@ -48,6 +53,7 @@ covered by `registry.test.js`.
 | `category` | `'io' \| 'llm' \| 'logic' \| 'data' \| 'utility'` | Drives accent colour, toolbar grouping, minimap colour. |
 | `fields` | `FieldConfig[]?` | Auto-rendered in order. |
 | `handles` | `HandleConfig[] \| (data) => HandleConfig[]` | A function makes ports dynamic. |
+| `outputs` | `OutputConfig[] \| (data) => OutputConfig[]` | Renders the outputs panel. A function makes it track data. |
 | `size` | `object \| (data) => object` | `{ width, minHeight }`. A function makes the card resize with content. |
 | `render` | `Component?` | Escape hatch — replaces the auto-rendered body entirely. |
 | `defaultData` | `object?` | Seeds `node.data` for keys not owned by a field. |
@@ -58,13 +64,20 @@ covered by `registry.test.js`.
 
 | Key | Type | Notes |
 |---|---|---|
-| `key` | `string` | Where the value lives in `node.data`. |
-| `type` | `'text' \| 'textarea' \| 'select' \| 'number' \| 'checkbox'` | |
+| `key` | `string` | Where the value lives in `node.data`. Omitted by `action`, which owns no value. |
+| `type` | `'text' \| 'textarea' \| 'number' \| 'password' \| 'select' \| 'checkbox' \| 'toggle' \| 'action'` | |
 | `label` | `string` | Rendered as a real `<label>`, so it's queryable and accessible. |
 | `defaultValue` | `any \| (id) => any` | The function form is for ID-derived defaults like `input_1`. |
 | `options` | `{label, value}[]` | `select` only. |
 | `numeric` | `{min, max, step}` | `number` only. |
+| `labels` | `[off, on]` | `toggle` only. Names both states either side of the switch. |
+| `run` | `(data, set) => void` | `action` only. `set(key, value)` is bound to this node. |
+| `icon` | `Component` | `action` only. |
+| `tone` | `'danger'?` | `action` only. |
 | `rows` | `number` | `textarea` only. |
+| `required` | `boolean?` | Red `*`, `aria-required`, and a `Required` error while blank. |
+| `help` | `string?` | `ⓘ` tooltip, wired to the control with `aria-describedby`. |
+| `badge` | `string \| null?` | Type pill. Defaults from `type`; `null` opts out. |
 | `visibleIf` | `(data) => boolean` | Conditional display. |
 | `validate` | `(value) => string \| null` | Return a message to show an inline error. |
 
@@ -79,9 +92,21 @@ covered by `registry.test.js`.
 
 Ports are distributed evenly down their side automatically. No config ever computes an offset.
 
+### `OutputConfig`
+
+| Key | Type | Notes |
+|---|---|---|
+| `key` | `string` | Field name as a downstream node would reference it. |
+| `type` | `string` | Free text — `Text`, `Integer`, `List<JSON>`. Rendered as a badge. |
+| `description` | `string?` | One line under the name. |
+| `advanced` | `boolean?` | Starts collapsed behind a disclosure. |
+
+`outputs` is declaration only — nothing executes a pipeline here. It states the contract so
+it can be read off the canvas instead of inferred.
+
 ---
 
-## The two design decisions that matter
+## The design decisions that matter
 
 ### `handles` can be a function of `data`
 
@@ -123,6 +148,26 @@ calls `pruneEdges` to delete any edge pointing at a port that no longer exists �
 
 Measurement has a third trigger that isn't about config at all: see
 [ARCHITECTURE.md § Port measurement](ARCHITECTURE.md#port-measurement).
+
+### `outputs` is a function of `data` too
+
+The same trick, applied to what a node emits rather than what it accepts. **JSON Parse**
+derives both from one field, so a single comma-separated list drives the ports you wire out
+of *and* the contract shown beside them:
+
+```js
+handles: (data) => [
+  { type: 'target', id: 'json' },
+  ...keysOf(data.keys).map((key, index) => ({ type: 'source', id: `out-${index}`, label: key })),
+],
+outputs: (data) => keysOf(data.keys).map((key) => ({ key, type: 'Any', description: `Value at ${key}` })),
+```
+
+**Database** does the narrower version: read mode emits `rows`, write mode emits `written`.
+
+An outputs panel changes the card's width, which moves the right-hand ports — so the
+resolved output count is part of what `createNode` watches before asking React Flow to
+re-measure.
 
 ### `render` is an escape hatch
 

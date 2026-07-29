@@ -2,18 +2,18 @@ import { getNodesBounds, getViewportForBounds } from 'reactflow';
 
 /**
  * The canvas runs full-bleed beneath the floating chrome — that is what makes the glass
- * refract — so fitting to the whole pane parks nodes under the header, the node rail and
- * the bottom-right instrument cluster. These insets describe what is actually free.
+ * refract — so fitting to the whole pane parks nodes under the action buttons, the node
+ * rail and the bottom-right instrument cluster. These insets describe what is free.
  *
  * The bottom band is the tallest piece of chrome in that corner (the minimap), which also
  * clears the zoom bar and the bin stacked above it; nothing else reaches the right edge,
  * so that inset is only a margin.
  */
 export const CHROME = {
-  top: 56, // 56px header
+  top: 0, // the floating Clear all / Submit pair
   right: 24,
-  bottom: 148, // 120px minimap + its 16px offset
-  left: 84, // 60px collapsed node rail + its 16px offset
+  bottom: 120, // 120px minimap + its 16px offset
+  left: 54, // 60px collapsed node rail + its 16px offset
 };
 
 /**

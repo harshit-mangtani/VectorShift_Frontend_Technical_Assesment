@@ -4,21 +4,21 @@ import { outputConfig } from './configs/output.config';
 import { llmConfig } from './configs/llm.config';
 import { textConfig } from './configs/text.config';
 import { filterConfig } from './configs/filter.config';
-import { transformConfig } from './configs/transform.config';
 import { apiRequestConfig } from './configs/apiRequest.config';
-import { databaseConfig } from './configs/database.config';
+import { webhookConfig } from './configs/webhook.config';
+import { jsonParseConfig } from './configs/jsonParse.config';
 import { noteConfig } from './configs/note.config';
 
 // Adding a node type: write a config, add it here. Nothing else in the app changes.
 export const nodeConfigs = [
   inputConfig,
   outputConfig,
+  webhookConfig,
   llmConfig,
   textConfig,
   filterConfig,
-  transformConfig,
   apiRequestConfig,
-  databaseConfig,
+  jsonParseConfig,
   noteConfig,
 ];
 
@@ -51,6 +51,7 @@ export const initialNodeData = (type, id) => {
   const config = configByType[type];
   const data = { id, nodeType: type, ...config.defaultData };
   for (const field of config.fields ?? []) {
+    if (!field.key) continue; // an action is a button, not a value
     data[field.key] =
       typeof field.defaultValue === 'function'
         ? field.defaultValue(id)

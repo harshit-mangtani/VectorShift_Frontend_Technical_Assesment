@@ -6,7 +6,7 @@ Production build, gzipped:
 
 | Asset | Size |
 |---|---|
-| `main.js` | 110.6 kB |
+| `main.js` | 113.5 kB |
 | `main.css` | 8.0 kB |
 
 React Flow accounts for the bulk of the JS. Tailwind's content scanning keeps CSS at
@@ -79,5 +79,5 @@ second for the duration of a drag. Two consequences, both handled:
 | Normalising the store to a `Map` | `nodes.map()` is O(n) per update, but debouncing already caps that at ~7 updates/sec. Normalisation adds complexity at every React Flow integration point for no gain at this scale. |
 | `onlyRenderVisibleElements` | A real option and one prop away, but it should be enabled on evidence, not by default — it has trade-offs during fast panning. Left off pending the Scale measurement above. |
 | Redux | Zustand already fits. |
-| Route-level code splitting / lazy MiniMap | Single-route app; the split would cost a waterfall and save nothing meaningful against a 110 kB bundle. |
+| Route-level code splitting / lazy MiniMap | Single-route app; the split would cost a waterfall and save nothing meaningful against a 111 kB bundle. |
 | Windowing the node library | Nine items. |

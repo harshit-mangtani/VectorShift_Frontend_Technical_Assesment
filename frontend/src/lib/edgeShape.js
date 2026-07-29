@@ -1,5 +1,6 @@
-// 'straight' is the trimmed step edge; 'curved' is React Flow's own bezier.
-export const EDGE_TYPE = { straight: 'trimmed', curved: 'default' };
+// 'straight' is the trimmed step edge; 'curved' wraps React Flow's bezier. Both are
+// custom types so either shape keeps its midpoint delete button.
+export const EDGE_TYPE = { straight: 'trimmed', curved: 'curved' };
 export const CONNECTION_LINE = { straight: 'smoothstep', curved: 'bezier' };
 
 /**

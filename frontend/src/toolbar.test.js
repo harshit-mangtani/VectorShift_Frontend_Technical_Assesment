@@ -151,10 +151,10 @@ describe('node library', () => {
       fireEvent.change(screen.getByPlaceholderText('Search nodes'), {
         target: { value: 'filt' },
       });
-      expect(screen.queryByRole('button', { name: 'Database' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Webhook' })).not.toBeInTheDocument();
 
       fireEvent.mouseLeave(rail());
-      expect(screen.getByRole('button', { name: 'Database' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Webhook' })).toBeInTheDocument();
     });
   });
 

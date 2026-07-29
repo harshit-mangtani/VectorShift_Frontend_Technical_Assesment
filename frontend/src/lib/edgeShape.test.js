@@ -19,18 +19,18 @@ describe('edge shape', () => {
     ]);
   });
 
-  it('hands curved edges back to React Flow', () => {
+  it('routes through the bezier edge when curved', () => {
     expect(shapeEdges(edges, 'curved').map((e) => e.type)).toEqual([
-      'default',
-      'default',
+      'curved',
+      'curved',
     ]);
   });
 
   it('re-routes connections that are already on the canvas', () => {
     const straight = shapeEdges(edges, 'straight');
     expect(shapeEdges(straight, 'curved').map((e) => e.type)).toEqual([
-      'default',
-      'default',
+      'curved',
+      'curved',
     ]);
   });
 

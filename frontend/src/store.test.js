@@ -1,26 +1,37 @@
 import { useStore } from './store';
 
-const reset = (state) =>
-  useStore.setState({ nodes: [], edges: [], nodeIDs: {}, ...state });
+const reset = (state) => useStore.setState({ nodes: [], edges: [], ...state });
 
 const node = (id) => ({ id, type: 'text', position: { x: 0, y: 0 }, data: {} });
 
 beforeEach(() => reset());
 
 describe('getNodeID', () => {
-  it('increments per type', () => {
+  const typed = (id, type) => ({ id, type, position: { x: 0, y: 0 }, data: {} });
+
+  it('counts per type, independently', () => {
+    reset({ nodes: [typed('text-1', 'text'), typed('llm-1', 'llm')] });
     const { getNodeID } = useStore.getState();
-    expect([getNodeID('text'), getNodeID('text'), getNodeID('llm')]).toEqual([
-      'text-1',
+
+    expect([getNodeID('text'), getNodeID('llm'), getNodeID('filter')]).toEqual([
       'text-2',
-      'llm-1',
+      'llm-2',
+      'filter-1',
     ]);
   });
 
-  it('does not reuse an id after the node is deleted', () => {
-    const { getNodeID } = useStore.getState();
-    getNodeID('text');
-    reset({ nodeIDs: useStore.getState().nodeIDs });
+  it('reuses the number once its node is gone', () => {
+    reset({ nodes: [typed('text-1', 'text'), typed('text-2', 'text')] });
+    expect(useStore.getState().getNodeID('text')).toBe('text-3');
+
+    useStore.getState().removeNode('text-1');
+    expect(useStore.getState().getNodeID('text')).toBe('text-1');
+  });
+
+  it('fills the lowest gap rather than appending', () => {
+    reset({
+      nodes: [typed('text-1', 'text'), typed('text-3', 'text'), typed('text-4', 'text')],
+    });
     expect(useStore.getState().getNodeID('text')).toBe('text-2');
   });
 });

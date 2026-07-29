@@ -1,4 +1,5 @@
 import { BaseEdge, Position, getSmoothStepPath } from 'reactflow';
+import { EdgeDeleteButton } from './EdgeDeleteButton';
 
 /**
  * Guarantees every edge meets its target head-on. getSmoothStepPath gives each end a
@@ -24,7 +25,7 @@ const PULL_BACK = {
 };
 
 /** Pure so the geometry can be asserted without rendering. */
-export const buildPath = ({
+export const buildEdge = ({
   sourceX,
   sourceY,
   sourcePosition,
@@ -34,7 +35,7 @@ export const buildPath = ({
 }) => {
   const [dx, dy] = PULL_BACK[targetPosition] ?? [-GAP, 0];
 
-  const [path] = getSmoothStepPath({
+  const [path, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
     sourcePosition,
@@ -47,16 +48,18 @@ export const buildPath = ({
     offset: STUB,
   });
 
-  return path;
+  return { path, labelX, labelY };
 };
 
-export const TrimmedEdge = ({ id, markerEnd, style, ...geometry }) => (
-  <BaseEdge
-    id={id}
-    path={buildPath(geometry)}
-    markerEnd={markerEnd}
-    style={style}
-  />
-);
+export const buildPath = (geometry) => buildEdge(geometry).path;
 
-export const edgeTypes = { trimmed: TrimmedEdge };
+export const TrimmedEdge = ({ id, markerEnd, style, ...geometry }) => {
+  const { path, labelX, labelY } = buildEdge(geometry);
+
+  return (
+    <>
+      <BaseEdge id={id} path={path} markerEnd={markerEnd} style={style} />
+      <EdgeDeleteButton id={id} labelX={labelX} labelY={labelY} />
+    </>
+  );
+};

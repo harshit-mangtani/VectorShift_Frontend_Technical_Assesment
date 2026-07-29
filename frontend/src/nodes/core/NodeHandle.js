@@ -3,10 +3,10 @@ import { Handle, Position } from 'reactflow';
 
 const POSITION = { left: Position.Left, right: Position.Right };
 
-// Labels sit outside the card so they can never collide with field content, whose
-// width varies per node. `calc(100% + 12px)` clears the handle dot, which straddles
-// the border at -5px.
-const OUTSIDE = 'calc(100% + 12px)';
+// Labels sit outside the card so they can never collide with field content, whose width
+// varies per node. The dot straddles the border from -5px to +4px, so this leaves 15px of
+// clear air between the label and the port rather than letting the two crowd each other.
+const OUTSIDE = 'calc(100% + 20px)';
 
 // Edges leave a port horizontally, straight through where the label sits. Rather than a
 // plate — which reads as a grey box — the same white shadow is stacked several times to

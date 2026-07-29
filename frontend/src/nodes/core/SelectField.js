@@ -20,7 +20,7 @@ const HANDLED = new Set([
   'Escape',
 ]);
 
-export const SelectField = ({ id, options, value, onChange, invalid }) => {
+export const SelectField = ({ id, options, value, onChange, invalid, ...aria }) => {
   const [open, setOpen] = useState(false);
   const wrap = useRef(null);
   const list = useRef(null);
@@ -143,6 +143,7 @@ export const SelectField = ({ id, options, value, onChange, invalid }) => {
         aria-expanded={open}
         aria-controls={`${id}-listbox`}
         aria-activedescendant={open ? `${id}-opt-${active}` : undefined}
+        {...aria}
         onClick={() => (open ? setOpen(false) : openList(false))}
         onKeyDown={onKeyDown}
         className={clsx(

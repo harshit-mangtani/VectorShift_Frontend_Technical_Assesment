@@ -1,8 +1,8 @@
 import clsx from 'clsx';
-import { categoryChip } from './nodes/core/nodeVariants';
+import { nodeChip } from './nodes/core/nodeVariants';
 
 export const DraggableNode = ({ config, onAdd, open }) => {
-  const { type, label, icon: Icon, category } = config;
+  const { type, label, icon: Icon } = config;
 
   const onDragStart = (event) => {
     event.dataTransfer.setData(
@@ -27,29 +27,33 @@ export const DraggableNode = ({ config, onAdd, open }) => {
       }}
       title={open ? config.description : label}
       className={clsx(
-        'group flex w-full cursor-grab items-center rounded-xl border border-transparent',
-        'py-1.5 text-left text-sm text-ink transition-all duration-200',
+        // px-1 is load-bearing: collapsed, the icon's offset from the rail edge is the
+        // sum of the rail border (1), the list padding (10), this border (1) and this
+        // padding (4) — which is exactly half the 60px rail less the 28px icon.
+        'group flex w-full cursor-grab items-center gap-2.5 rounded-md px-1',
+        'border border-transparent py-1.5 text-left text-sm text-ink',
+        'transition-colors duration-200',
         'hover:border-white/80 hover:bg-white/70 hover:shadow-card',
         'active:scale-[.97] active:cursor-grabbing',
-        'focus:outline-none focus-visible:ring-4 focus-visible:ring-brand/20',
-        open ? 'gap-2.5 px-1.5' : 'justify-center gap-0 px-0'
+        'focus:outline-none focus-visible:ring-4 focus-visible:ring-brand/20'
       )}
     >
       <span
         className={clsx(
           'flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px]',
           'transition-transform duration-200 group-hover:scale-110',
-          categoryChip[category]
+          nodeChip
         )}
       >
         <Icon size={15} strokeWidth={2.1} />
       </span>
       {/* Kept mounted while collapsed so the button retains its accessible name. */}
+      {/* Fixed width, clipped by the rail. Animating the label's own width made every
+          row re-lay-out on each frame of the expansion — the source of the judder. */}
       <span
         className={clsx(
-          'overflow-hidden whitespace-nowrap font-medium',
-          'transition-[max-width,opacity] duration-300 ease-out',
-          open ? 'max-w-[150px] opacity-100' : 'max-w-0 opacity-0'
+          'w-[150px] shrink-0 overflow-hidden whitespace-nowrap font-medium rail-ease',
+          open ? 'opacity-100 delay-75' : 'opacity-0'
         )}
       >
         {label}

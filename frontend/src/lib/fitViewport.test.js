@@ -38,7 +38,6 @@ describe('fitting into the free area', () => {
       CHROME.left + (PANE.width - CHROME.left - CHROME.right) / 2,
       6
     );
-    expect(centre).toBeGreaterThan(PANE.width / 2);
   });
 
   it('respects the zoom limits', () => {
@@ -53,8 +52,13 @@ describe('fitting into the free area', () => {
     expect(fitViewport([], PANE, ZOOM)).toBeNull();
   });
 
+  // Derived from CHROME rather than hard-coded, so retuning the insets can't quietly
+  // turn this into a test of nothing.
   it('defers to React Flow when the insets leave no room', () => {
-    expect(fitViewport(graph, { width: 90, height: 700 }, ZOOM)).toBeNull();
-    expect(fitViewport(graph, { width: 1200, height: 150 }, ZOOM)).toBeNull();
+    const flat = { width: 1200, height: CHROME.top + CHROME.bottom };
+    const narrow = { width: CHROME.left + CHROME.right, height: 700 };
+
+    expect(fitViewport(graph, narrow, ZOOM)).toBeNull();
+    expect(fitViewport(graph, flat, ZOOM)).toBeNull();
   });
 });

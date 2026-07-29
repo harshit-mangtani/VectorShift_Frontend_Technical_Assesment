@@ -47,18 +47,11 @@ module.exports = {
           to: { opacity: '1', transform: 'none' },
         },
         // The bin's reaction as a deleted node lands in it.
-        gulp: {
-          '0%': { transform: 'scale(1.25)' },
-          '55%': { transform: 'scale(1.05)' },
-          '75%': { transform: 'scale(1.4)' },
-          '100%': { transform: 'scale(1.25)' },
-        },
       },
       animation: {
         dot: 'dot 1.1s infinite ease-in-out',
         floatIn: 'floatIn .28s ease-out both',
         popIn: 'popIn .18s ease-out both',
-        gulp: 'gulp 450ms ease-out',
       },
     },
   },

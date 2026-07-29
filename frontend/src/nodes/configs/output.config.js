@@ -11,12 +11,14 @@ export const outputConfig = {
       key: 'outputName',
       type: 'text',
       label: 'Name',
+      help: 'The key this result is returned under.',
       defaultValue: (id) => id.replace('customOutput-', 'output_'),
     },
     {
       key: 'outputType',
       type: 'select',
       label: 'Type',
+      help: 'How the result is rendered when the pipeline finishes.',
       defaultValue: 'Text',
       options: [
         { label: 'Text', value: 'Text' },

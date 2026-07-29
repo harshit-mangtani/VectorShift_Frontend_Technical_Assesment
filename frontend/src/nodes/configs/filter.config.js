@@ -14,6 +14,7 @@ export const filterConfig = {
       key: 'operator',
       type: 'select',
       label: 'Condition',
+      help: 'Unary operators hide the value field — there is nothing to compare against.',
       defaultValue: 'equals',
       options: [
         { label: 'equals', value: 'equals' },
@@ -26,13 +27,15 @@ export const filterConfig = {
       key: 'value',
       type: 'text',
       label: 'Value',
+      help: 'Compared against each incoming record. Hidden for unary operators.',
       defaultValue: '',
       visibleIf: (data) => !UNARY.includes(data.operator),
     },
     {
       key: 'caseSensitive',
-      type: 'checkbox',
+      type: 'toggle',
       label: 'Case sensitive',
+      help: 'Off, "Ada" and "ada" are treated as the same value.',
       defaultValue: false,
     },
   ],
@@ -40,5 +43,9 @@ export const filterConfig = {
     { type: 'target', id: 'input' },
     { type: 'source', id: 'pass', label: 'pass' },
     { type: 'source', id: 'fail', label: 'fail' },
+  ],
+  outputs: [
+    { key: 'pass', type: 'List<Any>', description: 'Records matching the condition' },
+    { key: 'fail', type: 'List<Any>', description: 'Everything else' },
   ],
 };

@@ -1,6 +1,6 @@
 import { fireEvent, screen, within } from '@testing-library/react';
 import { useStore } from '../../store';
-import { renderFlow, makeNode, resetStore, handleIds } from '../../testUtils';
+import { renderFlow, makeNode, resetStore } from '../../testUtils';
 
 afterEach(resetStore);
 
@@ -159,18 +159,15 @@ describe('SelectField', () => {
     expect(queryListbox()).toBeInTheDocument();
   });
 
-  it('drives a field that changes the node topology', () => {
-    const { container } = renderFlow([makeNode('database', 'database-1')]);
-    expect(handleIds(container)).toEqual(['database-1-query', 'database-1-rows']);
+  it('drives a field that reshapes the node', () => {
+    renderFlow([makeNode('filter', 'filter-1')]);
+    expect(screen.getByLabelText('Value')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText('Mode'));
-    fireEvent.click(option('Write'));
+    fireEvent.click(screen.getByLabelText('Condition'));
+    fireEvent.click(option('is empty'));
 
-    expect(useStore.getState().nodes[0].data.mode).toBe('write');
-    expect(handleIds(container)).toEqual([
-      'database-1-query',
-      'database-1-records',
-      'database-1-written',
-    ]);
+    // A unary operator has nothing to compare against, so the field goes away with it.
+    expect(useStore.getState().nodes[0].data.operator).toBe('is_empty');
+    expect(screen.queryByLabelText('Value')).not.toBeInTheDocument();
   });
 });

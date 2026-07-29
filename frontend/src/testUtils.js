@@ -4,7 +4,12 @@ import { nodeTypes, initialNodeData } from './nodes/registry';
 import { useStore } from './store';
 
 export const resetStore = () =>
-  useStore.setState({ nodes: [], edges: [], nodeIDs: {}, edgeShape: 'straight' });
+  useStore.setState({
+    nodes: [],
+    edges: [],
+    edgeShape: 'straight',
+    pendingDeleteId: null,
+  });
 
 export const makeNode = (type, id, data) => ({
   id,

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import ReactFlow, {
   Background,
   BackgroundVariant,
@@ -7,42 +7,34 @@ import ReactFlow, {
   MiniMap,
   Panel,
   useReactFlow,
+  useStore as useFlowStore,
+  useStoreApi,
 } from 'reactflow';
-import clsx from 'clsx';
-import { Maximize } from 'lucide-react';
+import { Lock, Maximize, Unlock } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from './store';
 import { useAddNode } from './hooks/useAddNode';
 import { nodeTypes, configByType } from './nodes/registry';
-import { edgeTypes } from './edges/TrimmedEdge';
+import { edgeTypes } from './edges';
 import { fitViewport } from './lib/fitViewport';
 import { CONNECTION_LINE, shapeEdges } from './lib/edgeShape';
-import { categoryHex } from './nodes/core/nodeVariants';
-import { DeleteDropZone } from './components/DeleteDropZone';
+import { ACCENT } from './nodes/core/nodeVariants';
 import { EdgeShapeToggle } from './components/EdgeShapeToggle';
 import { ConfirmDialog } from './components/ConfirmDialog';
-import { FlyingGhost } from './components/FlyingGhost';
-
-import 'reactflow/dist/style.css';
 
 const GRID = 20;
-const HIT_PADDING = 14;
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 2;
+// Four 26px buttons, three 2px gaps, 3px of padding each side (see index.css) — the
+// minimap matches it so the corner reads as one cluster, not two stacked objects.
+const CONTROLS_HEIGHT = 4 * 26 + 3 * 2 + 6;
+const DELETE_KEY = 'Delete';
 const proOptions = { hideAttribution: true };
-const minimapColor = (node) =>
-  categoryHex[configByType[node.type]?.category] ?? '#94A3B8';
+const minimapColor = () => ACCENT;
 
-const prefersReducedMotion = () =>
-  typeof window.matchMedia === 'function' &&
-  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-// React Flow hands back a mouse event for pointer drags and a touch event on mobile.
-const pointerOf = (event) => {
-  if (typeof event?.clientX === 'number') return event;
-  const touch = event?.changedTouches?.[0] ?? event?.touches?.[0];
-  return touch ?? event?.sourceEvent ?? null;
-};
+// Backspace inside a field means "erase a character", never "delete the node".
+const isTyping = (el) =>
+  !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
 
 const selector = (state) => ({
   nodes: state.nodes,
@@ -54,41 +46,48 @@ const selector = (state) => ({
 
 export const PipelineUI = () => {
   const { screenToFlowPosition, setViewport, fitView } = useReactFlow();
+  const flowStore = useStoreApi();
+  const interactive = useFlowStore((s) => s.nodesDraggable);
   const addNode = useAddNode();
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect } = useStore(
     useShallow(selector)
   );
   const removeNode = useStore((s) => s.removeNode);
   const removeEdge = useStore((s) => s.removeEdge);
-  const setNodePosition = useStore((s) => s.setNodePosition);
   const edgeShape = useStore((s) => s.edgeShape);
   const toggleEdgeShape = useStore((s) => s.toggleEdgeShape);
+  const pendingDeleteId = useStore((s) => s.pendingDeleteId);
+  const requestDelete = useStore((s) => s.requestDelete);
 
   const shapedEdges = useMemo(() => shapeEdges(edges, edgeShape), [edges, edgeShape]);
 
   const paneRef = useRef(null);
-  const trashRef = useRef(null);
-  const origin = useRef(null);
-  const [armed, setArmed] = useState(false);
-  const [pending, setPending] = useState(null);
-  const [ghost, setGhost] = useState(null);
-  const [swallowing, setSwallowing] = useState(false);
-
   const selected = nodes.find((node) => node.selected);
   const selectedEdge = edges.find((edge) => edge.selected);
+  const pending = nodes.find((node) => node.id === pendingDeleteId);
 
-  // Nodes are confirmed before deletion; a connection is trivial to redraw, so it goes
-  // straight away.
-  const deleteSelection = useCallback(() => {
-    if (selected) setPending(selected);
-    else if (selectedEdge) removeEdge(selectedEdge.id);
-  }, [selected, selectedEdge, removeEdge]);
+  // React Flow's own deleteKeyCode removes the selection outright, so it is turned off and
+  // handled here instead: a node is confirmed first, a connection is not — it costs one
+  // drag to redraw, and a dialog for that is friction rather than safety.
+  //
+  // Delete only, never Backspace. Backspace is an editing key before it is a destructive
+  // one, and binding it canvas-wide means a stray press outside a field costs a node.
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      // event.target, not activeElement: the key was delivered to whatever had focus, and
+      // that is the thing entitled to consume it.
+      if (event.key !== DELETE_KEY || isTyping(event.target)) return;
 
-  const deleteTitle = selected
-    ? 'Delete the selected node'
-    : selectedEdge
-    ? 'Delete the selected connection'
-    : 'Select a node or connection, or drag a node here';
+      if (selected) requestDelete(selected.id);
+      else if (selectedEdge) removeEdge(selectedEdge.id);
+      else return;
+
+      event.preventDefault();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selected, selectedEdge, requestDelete, removeEdge]);
 
   const onDrop = useCallback(
     (event) => {
@@ -107,6 +106,11 @@ export const PipelineUI = () => {
     [addNode, screenToFlowPosition]
   );
 
+  const onDragOver = useCallback((event) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
   // React Flow's own fit uses the whole pane, which tucks nodes under the floating
   // chrome. This frames them into what is actually visible instead.
   const fitToFreeSpace = useCallback(() => {
@@ -118,83 +122,26 @@ export const PipelineUI = () => {
     else fitView({ duration: 300 });
   }, [nodes, setViewport, fitView]);
 
-  const onDragOver = useCallback((event) => {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-  }, []);
-
-  const overTrash = useCallback((event) => {
-    const zone = trashRef.current;
-    const point = pointerOf(event);
-    if (!zone || !point) return false;
-
-    const r = zone.getBoundingClientRect();
-    return (
-      point.clientX >= r.left - HIT_PADDING &&
-      point.clientX <= r.right + HIT_PADDING &&
-      point.clientY >= r.top - HIT_PADDING &&
-      point.clientY <= r.bottom + HIT_PADDING
-    );
-  }, []);
-
-  const onNodeDragStart = useCallback((_, node) => {
-    origin.current = { id: node.id, position: node.position };
-  }, []);
-
-  // Only flips on a boundary crossing, so this does not re-render per frame.
-  const onNodeDrag = useCallback(
-    (event) => {
-      const over = overTrash(event);
-      setArmed((was) => (was === over ? was : over));
-    },
-    [overTrash]
-  );
-
-  const onNodeDragStop = useCallback(
-    (event, node) => {
-      if (overTrash(event)) setPending(node);
-      setArmed(false);
-    },
-    [overTrash]
-  );
+  // Locking the canvas is three separate React Flow flags; the control presents them as
+  // one, which is how a user thinks about it.
+  const toggleLock = useCallback(() => {
+    const next = !flowStore.getState().nodesDraggable;
+    flowStore.setState({
+      nodesDraggable: next,
+      nodesConnectable: next,
+      elementsSelectable: next,
+    });
+  }, [flowStore]);
 
   const confirmDelete = useCallback(() => {
-    const el = document.querySelector(`.react-flow__node[data-id="${pending.id}"]`);
-    const zone = trashRef.current;
-
-    if (el && zone && !prefersReducedMotion()) {
-      const from = el.getBoundingClientRect();
-      const box = zone.getBoundingClientRect();
-      setGhost({
-        from,
-        to: { x: box.left + box.width / 2, y: box.top + box.height / 2 },
-        category: configByType[pending.type]?.category,
-      });
-      setSwallowing(true);
-    }
-
     removeNode(pending.id);
-    setPending(null);
-  }, [pending, removeNode]);
+    requestDelete(null);
+  }, [pending, removeNode, requestDelete]);
 
-  const endSwoop = useCallback(() => {
-    setGhost(null);
-    setSwallowing(false);
-  }, []);
-
-  // Cancelling should not leave the node parked on top of the delete button.
-  const cancelDelete = useCallback(() => {
-    if (origin.current?.id === pending?.id) {
-      setNodePosition(pending.id, origin.current.position);
-    }
-    setPending(null);
-  }, [pending, setNodePosition]);
+  const cancelDelete = useCallback(() => requestDelete(null), [requestDelete]);
 
   return (
-    <div
-      ref={paneRef}
-      className={clsx('relative h-full w-full', armed && 'trash-armed')}
-    >
+    <div ref={paneRef} className="relative h-full w-full">
       <ReactFlow
         nodes={nodes}
         edges={shapedEdges}
@@ -203,16 +150,13 @@ export const PipelineUI = () => {
         onConnect={onConnect}
         onDrop={onDrop}
         onDragOver={onDragOver}
-        onNodeDragStart={onNodeDragStart}
-        onNodeDrag={onNodeDrag}
-        onNodeDragStop={onNodeDragStop}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         proOptions={proOptions}
         snapGrid={[GRID, GRID]}
         connectionLineType={CONNECTION_LINE[edgeShape]}
-        connectionLineStyle={{ stroke: '#6366F1', strokeWidth: 2 }}
-        deleteKeyCode={['Backspace', 'Delete']}
+        connectionLineStyle={{ stroke: '#9aa1b5', strokeWidth: 2 }}
+        deleteKeyCode={null}
         elevateNodesOnSelect
         minZoom={MIN_ZOOM}
         maxZoom={MAX_ZOOM}
@@ -229,26 +173,18 @@ export const PipelineUI = () => {
           zoomable
           nodeColor={minimapColor}
           nodeStrokeWidth={0}
-          style={{ width: 180, height: 120 }}
+          style={{ width: 180, height: CONTROLS_HEIGHT }}
           maskColor="rgba(244,245,251,0.65)"
           className="!bottom-4 !right-4 !m-0 !hidden !overflow-hidden !rounded-xl !border
                      !border-white/70 !bg-white/55 !shadow-glass !backdrop-blur-xl sm:!block"
         />
 
-        {/* One row for every canvas instrument, laid out beside the minimap; on mobile
-            the minimap is hidden and the row takes the corner itself. */}
+        {/* Canvas instruments, laid out beside the minimap; on mobile the minimap is
+            hidden and the row takes the corner itself. */}
         <Panel
           position="bottom-right"
           className="!bottom-4 !right-4 !m-0 flex items-end gap-2 sm:!right-[13.25rem]"
         >
-          <DeleteDropZone
-            ref={trashRef}
-            armed={armed || swallowing}
-            swallowing={swallowing}
-            disabled={!selected && !selectedEdge}
-            title={deleteTitle}
-            onClick={deleteSelection}
-          />
           <EdgeShapeToggle shape={edgeShape} onToggle={toggleEdgeShape} />
           {/* The built-in fit is replaced rather than extended — React Flow runs its own
               first, which would frame the graph under the chrome and then animate off it. */}
@@ -259,6 +195,18 @@ export const PipelineUI = () => {
           >
             <ControlButton onClick={fitToFreeSpace} title="fit view" aria-label="fit view">
               <Maximize size={13} strokeWidth={2.5} />
+            </ControlButton>
+            <ControlButton
+              onClick={toggleLock}
+              title={interactive ? 'Lock canvas' : 'Unlock canvas'}
+              aria-label={interactive ? 'Lock canvas' : 'Unlock canvas'}
+              aria-pressed={!interactive}
+            >
+              {interactive ? (
+                <Unlock size={13} strokeWidth={2.5} />
+              ) : (
+                <Lock size={13} strokeWidth={2.5} />
+              )}
             </ControlButton>
           </Controls>
         </Panel>
@@ -280,13 +228,13 @@ export const PipelineUI = () => {
         </div>
       )}
 
-      {ghost && <FlyingGhost {...ghost} onDone={endSwoop} />}
-
       {pending && (
+        // Named by id, not by type: with three LLM nodes on the canvas, "LLM will be
+        // removed" doesn't tell you which one you are about to lose.
         <ConfirmDialog
           title="Delete this node?"
-          message={`“${configByType[pending.type]?.label ?? pending.type}” and any
-                    connections to it will be removed. This can't be undone.`}
+          message={`${configByType[pending.type]?.label ?? pending.type} “${pending.id}”
+                    and any connections to it will be removed. This can't be undone.`}
           confirmLabel="Delete node"
           onConfirm={confirmDelete}
           onCancel={cancelDelete}

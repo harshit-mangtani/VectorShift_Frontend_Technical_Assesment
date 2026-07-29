@@ -30,9 +30,14 @@ former.
 
 ### Connections
 
-Drag from a right-hand port to a left-hand port. Selecting a connection and pressing
-<kbd>Delete</kbd> removes it — with no confirmation, because a connection is trivial to
-redraw. Nodes are confirmed, connections are not.
+Drag from a right-hand port to a left-hand port. Every connection carries a **✕ at its
+midpoint** — one click and it's gone, with no confirmation, because a connection is
+trivial to redraw. Nodes are confirmed, connections are not. Selecting one and pressing
+<kbd>Delete</kbd> works too.
+
+The button is real DOM on an SVG path, which only works through React Flow's
+`EdgeLabelRenderer` — an overlay that tracks the viewport transform. That overlay is
+`pointer-events: none`, so the button re-enables them for itself.
 
 ### Connection shape
 
@@ -41,7 +46,7 @@ A toggle in the bottom-right cluster switches every connection between:
 | | |
 |---|---|
 | **Straight** | The trimmed step edge — orthogonal runs, rounded elbows, arrowhead square to the card |
-| **Curved** | React Flow's own bezier |
+| **Curved** | React Flow's bezier, wrapped so it keeps the midpoint ✕ |
 
 The shape is a **view preference, not edge data**. It is stamped on at render time
 ([`lib/edgeShape.js`](../frontend/src/lib/edgeShape.js)), which is what lets the toggle
@@ -53,7 +58,7 @@ invalidate the whole graph. The in-progress connection line follows the same set
 
 React Flow's built-in fit frames the graph into the **whole pane**. The canvas here runs
 full-bleed underneath the floating chrome — that is what gives the glass something to
-refract — so the built-in fit reliably parks nodes under the header, the node rail and the
+refract — so the built-in fit reliably parks nodes under the action buttons, the rail and
 bottom-right instruments.
 
 [`lib/fitViewport.js`](../frontend/src/lib/fitViewport.js) frames into the free rectangle
@@ -67,25 +72,104 @@ the caller falls back to React Flow's fit. Better a cramped frame than none.
 
 ### Deleting
 
-Three routes, deliberately:
+Two routes to a node:
 
-1. <kbd>Delete</kbd> / <kbd>Backspace</kbd> on a selection.
-2. **Drag a node onto the bin** at the bottom-right.
-3. Click the bin to delete the current selection.
+1. The **✕ on the card itself** — no selection step.
+2. <kbd>Delete</kbd> on a selected node.
 
-React Flow drags nodes with **pointer events, not HTML5 drag-and-drop**, so there is no
-`drop` event to listen for. The bin instead hit-tests pointer coordinates against its own
-rect during `onNodeDrag`, and only flips state on a boundary crossing so it doesn't
-re-render at frame rate.
+Both converge on one store field, `pendingDeleteId`, so there is exactly one confirmation
+dialog no matter where the request came from.
 
-The bin opens its lid and turns red as a node comes over it, the node shrinks and tilts in
-your hand, and on confirm a card-shaped stand-in arcs into the bin as it gulps. Cancelling
-returns the node to where the drag started, so it isn't left parked on top of the bin. All
-motion is suppressed under `prefers-reduced-motion`.
+React Flow's own `deleteKeyCode` removes the selection outright, which is the wrong
+default for something irreversible — so it is switched off and the key is handled here.
+<kbd>Delete</kbd> only, never <kbd>Backspace</kbd> — Backspace is an editing key before
+it is a destructive one, and binding it canvas-wide means one stray press outside a field
+costs a node. The handler also ignores the keystroke when it was delivered to a field, and
+reads `event.target` rather than `document.activeElement`: the key went to whatever had
+focus, and that element is the one entitled to consume it.
+
+A **connection** goes without a dialog either way — the ✕ at its midpoint, or Delete while
+it's selected. When a node and a connection are both selected the node wins, because that
+is the larger of the two actions and the one worth asking about.
 
 ---
 
 ## Nodes
+
+### Card anatomy
+
+```
+┌─────────────────────────────────────────────┐┌────────────────────────┐
+│ ▣  LLM                                   ✕  ││  ⊟      Outputs        │   ← tinted band
+│    Run a prompt through a model             ││ Type "{{" in downstream│
+│ ╭─────────────── llm-1 ──────────────────╮  ││ nodes to leverage …    │
+├─────────────────────────────────────────────┤├────────────────────────┤
+│ Model                            [Dropdown] ││ Output Fields     Type │
+│ ┌─────────────────────────────────────────┐ │├────────────────────────┤
+│ │ GPT-4o                                ⌄ │ ││ response        [Text] │
+│ └─────────────────────────────────────────┘ ││ The output of the model│
+│ Temperature ⓘ                      [Number] │├────────────────────────┤
+└─────────────────────────────────────────────┘│ Advanced Outputs     ⌄ │ ← tinted band
+                                               └────────────────────────┘
+```
+
+Cards sit at an 8px radius with tight padding — denser than the surrounding chrome, which
+keeps its softer 12–16px. At canvas scale that reads as instrument rather than panel.
+
+**The identifier pill.** Every node shows its own id, in the same band as its title and
+description. It's what a `{{reference}}` resolves against, and without it the only way to
+know a node's id is to remember the order you added things in.
+
+**The header ✕.** Deletes the node it belongs to, selected or not. It writes the same
+`pendingDeleteId` the Delete key does, so both routes share one confirmation dialog rather
+than each growing its own.
+
+**Type badges.** Each field states what it accepts — `Text`, `Dropdown`, `Number`,
+`Secret` — derived from `field.type`, overridable per field, and suppressible with
+`badge: null`. Tickboxes and switches carry none: the control already says it is a yes/no.
+
+**Controls.** Beyond text, number and select there are three more, all config-declared:
+a **toggle** (`role="switch"`, optionally naming both states — JSON Parse switches between
+*Object* and *Array*), a **secret** (masked, and usually revealed by a tickbox — the LLM
+node's API key appears only when you opt out of workspace credits), and an **action**: a
+button whose `run(data, set)` writes back to its own node. JSON Parse's *Sort fields A–Z*
+rewrites the field its ports are derived from, so the ports re-order with it.
+
+Actions are deliberately narrow. `set` is bound to the node the button sits on, so a config
+can't reach across the canvas — node behaviour stays reviewable by reading one file.
+
+**Required markers and help.** `required: true` gives a red `*`, `aria-required`, and an
+inline *Required* while the value is blank — and it outranks any custom `validate`, since
+there is nothing to validate yet. `help: '…'` renders a `ⓘ` with a tooltip, and is wired to
+the control with `aria-describedby`.
+
+The tooltip is built rather than left to the `title` attribute. lucide renders an `<svg>`,
+and a `title` *attribute* on an SVG element doesn't reliably produce a tooltip — SVG expects
+a `<title>` child — so the help text was silently invisible. It also appears immediately
+rather than after the UA's delay. The string exists twice: the bubble is `aria-hidden`, and
+a screen-reader copy is what `aria-describedby` points at, because a hidden bubble would be
+unreachable at the moment the control takes focus.
+
+Everything except the field name sits **outside** the `<label>`. The control's accessible
+name has to stay exactly the label — otherwise a screen reader announces "Endpoint star
+info Text", and `getByLabelText('Endpoint')` stops resolving.
+
+**The outputs panel.** A node that declares `outputs` gets a second column naming every
+field it emits, with a type and a one-line description. Fields marked `advanced` start
+collapsed.
+
+This is declaration, not execution — nothing runs a pipeline here. The point is that the
+data contract is the thing you most need while wiring, and it's exactly what a node canvas
+normally hides until you connect something and see what comes out.
+
+The list caps its height and scrolls, since a derived set has no bound the config controls.
+Anything scrollable inside the canvas carries React Flow's `nowheel` class — otherwise the
+pane swallows the wheel to zoom and the only way to move the list is to drag its scrollbar.
+The same applies to a textarea that outgrows its rows.
+
+Like `handles`, `outputs` can be a function of `data`: **Database** emits `rows` in read
+mode and `written` in write mode; **JSON Parse** derives its ports *and* its contract from
+one comma-separated field.
 
 ### The Text node
 
@@ -108,8 +192,10 @@ connections survive it untouched.
 ### Every other node
 
 See [NODE_ABSTRACTION.md](NODE_ABSTRACTION.md). The short version: a node type is one
-config object, and the five new ones were chosen to prove different capabilities of the
-abstraction rather than to be plausible products.
+config object, and the new ones were chosen to prove different capabilities of the
+abstraction rather than to be plausible products — two source handles, per-field
+validation, a field that rewrites the node's own topology, a node with no inputs at all,
+and one whose ports and contract both come from a single text field.
 
 ---
 
@@ -126,8 +212,12 @@ commits before the payload is read, and `App.test.js` covers exactly that race.
 **Clear all** empties the canvas behind a confirmation.
 
 Both dialogs are portalled to `document.body`. They have to be: `backdrop-filter` on the
-glass header makes that header a containing block for `position: fixed`, so a dialog
-rendered inside it centres itself in the header rather than the screen.
+glass surface makes that surface a containing block for `position: fixed`, so a dialog
+rendered inside one centres itself in its parent rather than the screen.
+
+While a submit is in flight the canvas is sealed behind a scrim. The graph is read once,
+at click time; letting it be edited mid-flight would return an answer about a pipeline
+that no longer exists.
 
 ---
 
@@ -141,7 +231,9 @@ surfaces share one recipe: translucent white, a light border, `backdrop-blur-xl`
 **Node cards deliberately skip `backdrop-blur`.** Each blurred layer is its own compositing
 pass and a canvas can hold hundreds of cards; real glass is reserved for the handful of
 chrome surfaces, where the cost is bounded. Cards are opaque white with a soft category
-tint behind the header — which also means overlapping nodes never show through each other.
+tint behind the title band — which also means overlapping nodes never show through each
+other. Category drives grouping, not colour: five hues across a dense canvas read as noise
+rather than information, so one indigo accent carries the whole set.
 
 ### Transforms and measurement
 

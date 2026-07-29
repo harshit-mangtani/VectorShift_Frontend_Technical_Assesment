@@ -8,7 +8,7 @@ frontend/
   postcss.config.js           tailwind + autoprefixer
   tailwind.config.js          design tokens
   src/
-    App.js                    shell: header, toolbar, canvas
+    App.js                    shell: canvas, rail, the two floating actions
     store.js                  Zustand — nodes, edges, IDs
     toolbar.js                node library, reads the registry
     draggableNode.js          library entry (drag + click to add)
@@ -17,13 +17,14 @@ frontend/
     components/
       ResultDialog.js         the required alert
       ConfirmDialog.js        node delete + clear all
-      DeleteDropZone.js       the bin (pointer hit-tested, not HTML5 drop)
       EdgeShapeToggle.js      straight ↔ curved connections
-      FlyingGhost.js          the arc into the bin
-      ClearAllButton.js       header action
+      ClearAllButton.js       empties the canvas
       LoadingDots.js          submit pending state
     edges/
+      index.js                the edgeTypes map, built once
       TrimmedEdge.js          step edge that always meets its target head-on
+      CurvedEdge.js           bezier, wrapped so curved mode keeps the ✕
+      EdgeDeleteButton.js     midpoint delete, portalled onto the edge
     hooks/
       useAddNode.js           one creation path for drag and click
       useDebouncedField.js    local-first editing, debounced commit
@@ -39,7 +40,8 @@ frontend/
       pendingCommits.js       flush registry for debounced edits
     nodes/
       registry.js             single source of truth
-      core/                   BaseNode, Field, NodeHandle, createNode, nodeVariants
+      core/                   BaseNode, Field, FieldLabel, NodeHandle, OutputsPanel,
+                              TypeBadge, SelectField, createNode, nodeVariants
       configs/                one file per node type
 
 backend/
@@ -82,13 +84,13 @@ library click / canvas drop
 
 | Action | Guarantee |
 |---|---|
-| `getNodeID(type)` | Monotonic per type. Never reuses a number after deletion. |
+| `getNodeID(type)` | Lowest number not currently on the canvas, per type — derived from `nodes`, not a counter, so deleting `llm-1` frees it. Safe because `removeNode` takes the node's edges with it. Callers must add the node before asking again. |
 | `addNode(node)` | New array; existing node references preserved. |
 | `updateNodeField(id, key, value)` | Returns a new node **and** a new `data` object for the target only. Every other node keeps its identity, which is what makes `React.memo` effective. |
 | `pruneEdges(id, validHandleIds)` | Removes edges bound to handles that no longer exist on that node. No-ops (same array identity) when nothing changes. |
 | `removeNode(id)` | Drops the node and every edge attached to it. |
 | `removeEdge(id)` | Drops one connection. Unconfirmed by design — a connection is cheap to redraw. |
-| `setNodePosition(id, position)` | Puts a node back when a drag-to-delete is cancelled. |
+| `requestDelete(id \| null)` | Marks a node for deletion. A card's ✕ and the Delete key both write here, so one dialog serves both routes. |
 | `clearAll()` | Empties nodes and edges. |
 | `toggleEdgeShape()` | Flips `edgeShape` between `'straight'` and `'curved'`. A view preference; edges themselves carry no type. |
 | `onNodesChange` / `onEdgesChange` / `onConnect` | Standard React Flow handlers. |

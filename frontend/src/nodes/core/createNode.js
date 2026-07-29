@@ -8,6 +8,7 @@ const resolve = (value, data) =>
   typeof value === 'function' ? value(data) : value;
 
 export const resolveHandles = (config, data) => resolve(config.handles, data);
+export const resolveOutputs = (config, data) => resolve(config.outputs, data) ?? [];
 
 /**
  * Turns a NodeConfig into a React Flow node component. Adding a node type means
@@ -21,8 +22,12 @@ export const createNode = (config) => {
     const handles = resolveHandles(config, data) ?? [];
     const handleKey = handles.map((h) => h.id).join('|');
 
+    const outputs = resolveOutputs(config, data);
+
     const size = resolve(config.size, data);
-    const sizeKey = `${size?.width ?? ''}:${size?.minHeight ?? ''}`;
+    // Outputs sit beside the body, so gaining or losing one changes the card's width and
+    // moves the right-hand ports just as a size change does.
+    const sizeKey = `${size?.width ?? ''}:${size?.minHeight ?? ''}:${outputs.length}`;
 
     // React Flow caches handle offsets at mount and recomputes them only here. A card
     // that resizes (the Text node grows as you type) moves its right-hand ports, so the
@@ -48,6 +53,7 @@ export const createNode = (config) => {
         id={id}
         config={config}
         handles={handles}
+        outputs={outputs}
         selected={selected}
         size={size}
       >
@@ -55,7 +61,13 @@ export const createNode = (config) => {
           <Custom id={id} data={data} />
         ) : (
           fields.map((field) => (
-            <Field key={field.key} nodeId={id} field={field} value={data[field.key]} />
+            <Field
+              key={field.key ?? field.label}
+              nodeId={id}
+              field={field}
+              data={data}
+              value={data[field.key]}
+            />
           ))
         )}
       </BaseNode>

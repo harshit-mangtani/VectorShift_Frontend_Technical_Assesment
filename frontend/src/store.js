@@ -9,23 +9,42 @@ import {
 // No `type` here: the shape is a view preference, applied when the edge is rendered so
 // that flipping it re-routes the connections already on the canvas.
 const EDGE_STYLE = {
-  markerEnd: { type: MarkerType.ArrowClosed, height: 20, width: 20, color: '#8792ad' },
+  // Matches the resting stroke in index.css — the arrowhead is part of the same line.
+  markerEnd: { type: MarkerType.ArrowClosed, height: 20, width: 20, color: '#6366f1' },
 };
 
 export const useStore = create((set, get) => ({
   nodes: [],
   edges: [],
-  nodeIDs: {},
   edgeShape: 'straight',
+  // Deleting a node is confirmed wherever it is triggered from — the bin, a drag onto the
+  // bin, or the card's own ✕ — so the request lives here rather than in one component.
+  pendingDeleteId: null,
 
   toggleEdgeShape: () =>
     set({ edgeShape: get().edgeShape === 'straight' ? 'curved' : 'straight' }),
 
-  /** Monotonic per type; never reuses a freed number, so IDs stay unique across deletions. */
+  requestDelete: (nodeId) => set({ pendingDeleteId: nodeId }),
+
+  /**
+   * Lowest number not currently on the canvas, per type. Derived from `nodes` rather than
+   * from a counter: an id is user-facing here — it labels the card and the delete dialog —
+   * so deleting `llm-1` and adding another should give you `llm-1`, not `llm-2` and a gap
+   * that never closes.
+   *
+   * Reuse is safe because `removeNode` takes the node's edges with it, so nothing can
+   * still be pointing at the freed id. Callers must add the node before asking again.
+   */
   getNodeID: (type) => {
-    const nodeIDs = { ...get().nodeIDs, [type]: (get().nodeIDs[type] ?? 0) + 1 };
-    set({ nodeIDs });
-    return `${type}-${nodeIDs[type]}`;
+    const taken = new Set(
+      get()
+        .nodes.filter((node) => node.type === type)
+        .map((node) => node.id)
+    );
+
+    let n = 1;
+    while (taken.has(`${type}-${n}`)) n += 1;
+    return `${type}-${n}`;
   },
 
   addNode: (node) => set({ nodes: [...get().nodes, node] }),
@@ -53,14 +72,6 @@ export const useStore = create((set, get) => ({
     set({ edges: get().edges.filter((edge) => edge.id !== edgeId) }),
 
   clearAll: () => set({ nodes: [], edges: [] }),
-
-  /** Used to put a node back when a drag-to-delete is cancelled. */
-  setNodePosition: (nodeId, position) =>
-    set({
-      nodes: get().nodes.map((node) =>
-        node.id === nodeId ? { ...node, position } : node
-      ),
-    }),
 
   /** Replaces only the target node; every other node keeps its reference so memo holds. */
   updateNodeField: (nodeId, fieldName, fieldValue) =>

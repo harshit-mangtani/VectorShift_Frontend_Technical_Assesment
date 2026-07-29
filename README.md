@@ -46,19 +46,16 @@ The frontend targets `http://localhost:8000` by default; override with
    drop one in the centre.
 2. Drag from a node's right-hand port to another node's left-hand port to connect them.
 3. Edit fields directly on the card.
-4. Remove things three ways: press <kbd>Delete</kbd> on a selection, **drag a node onto the
-   bin** at the bottom-right, or click the bin to delete the selected node. Both bin routes
-   ask for confirmation first; deleting a *connection* doesn't, since it's trivial to redraw.
-5. Switch connections between **straight and curved** with the toggle beside the bin. It
+4. Remove a node with the **✕ on its card**, or select it and press <kbd>Delete</kbd>.
+   Both confirm first. A *connection* never does, since it's trivial to redraw — click the
+   **✕ at its midpoint**, or select and press <kbd>Delete</kbd>.
+5. Switch connections between **straight and curved** with the toggle by the zoom bar. It
    re-routes what's already on the canvas, not just new connections.
 6. **Fit view** frames the whole pipeline into the space the floating chrome leaves free,
    rather than under it.
-7. **Clear all** in the header empties the canvas, also behind a confirmation.
+7. **Clear all**, top-right, empties the canvas — also behind a confirmation. **Lock**,
+   in the zoom bar, freezes dragging, connecting and selecting in one switch.
 8. Hit **Submit** to analyse the pipeline.
-
-The bin opens its lid and turns red as a node comes over it, the node shrinks and tilts in
-your hand, and on confirm a card-shaped stand-in arcs into the bin as it gulps. All of it is
-suppressed under `prefers-reduced-motion`.
 
 A fuller tour, with the reasoning behind each behaviour, is in
 [docs/FEATURES.md](docs/FEATURES.md).
@@ -82,12 +79,17 @@ export const myNodeConfig = {
   icon: Sparkles,
   category: 'logic',
   fields: [
-    { key: 'mode', type: 'select', label: 'Mode', defaultValue: 'fast',
+    { key: 'mode', type: 'select', label: 'Mode', defaultValue: 'fast', required: true,
+      help: 'Precise costs more but scores better.',
       options: [{ label: 'Fast', value: 'fast' }, { label: 'Precise', value: 'precise' }] },
   ],
   handles: [
     { type: 'target', id: 'in' },
     { type: 'source', id: 'out' },
+  ],
+  outputs: [
+    { key: 'score', type: 'Decimal', description: 'Confidence, 0–1' },
+    { key: 'latency_ms', type: 'Integer', description: 'Time taken', advanced: true },
   ],
 };
 ```
@@ -103,30 +105,59 @@ The second half of the requirement — *applying styles across nodes* — is
 owns card appearance for every node type; editing it restyles all nine.
 
 **The five new nodes** were chosen for coverage rather than plausibility, since the brief
-asks for a demonstration of the abstraction's flexibility:
+asks for a demonstration of the abstraction's flexibility. Each buys a capability the
+other four don't:
 
 | Node | What it proves the abstraction can do |
 |---|---|
 | **Filter** | Two source handles, plus a field that appears only for binary operators (`visibleIf`) |
-| **Transform** | Reuses the Text node's `{{variable}}` ports in three lines of config |
-| **API Request** | Per-field validation — URL format, JSON parse, numeric bounds |
-| **Database** | A field that rewrites the node's own topology (write mode adds a port) |
+| **API Request** | Per-field validation across three field types, plus `required` and `help` |
+| **Webhook** | A source-only node — no target handles at all, and the layout adapts |
+| **JSON Parse** | Ports *and* declared outputs both derived from one field's value |
 | **Note** | The degenerate case: no handles, no header, fully custom body |
+
+Earlier drafts also had a Transform node and a Database node. Both were cut on the same
+test: Transform re-stated the Text node's `{{variable}}` mechanism, and Database's
+select-driven topology is the narrow case of what JSON Parse already shows. A node that
+duplicates a capability adds surface without adding evidence.
 
 ### Part 2 — Styling
 
 A minimal glassmorphic interface built on a semantic token layer in
 [`tailwind.config.js`](frontend/tailwind.config.js). A fixed three-point radial wash
 (indigo / violet / cyan over a near-white canvas) gives the glass something to refract;
-chrome surfaces — header, node rail, dialogs, minimap, and the bottom-right instrument row
-(bin, connection-shape toggle, vertical zoom bar) — share one `.glass` recipe of
-translucent white, a light border and `backdrop-blur-xl`. Accent is an indigo→violet
-gradient, one hue per node category, radii 12–16px.
+chrome surfaces — node rail, dialogs, minimap, and the bottom-right instrument row
+(connection-shape toggle, vertical zoom bar) — share one `.glass` recipe of translucent
+white, a light border and `backdrop-blur-xl`. Chrome keeps the softer 12–16px radii; node
+cards sit at 8px, which reads as denser and more instrument-like at canvas scale.
+
+**There is no header.** The canvas is the product, so the only two global actions float
+over it in one corner and every canvas instrument sits in the other. Everything between
+belongs to the pipeline.
+
+**One accent, everywhere.** An earlier pass gave each category its own hue. Five colours
+competing across a dense canvas read as noise rather than information — the icon already
+says what a node is — so category now drives grouping and ordering only, and indigo does
+the rest. The one place colour still carries meaning is connections: **grey while you are
+dragging one out, indigo once it exists**, so an in-progress link never looks finished.
 
 **Node cards deliberately skip `backdrop-blur`.** Each blurred layer is its own compositing
-pass, and a canvas can hold hundreds of nodes; they use translucent white with a soft
-category tint behind the header instead. Real glass is reserved for the handful of chrome
-surfaces, where the cost is bounded.
+pass, and a canvas can hold hundreds of nodes; they are opaque white with a tinted title
+band instead — which also means overlapping cards never show through one another. Real
+glass is reserved for the handful of chrome surfaces, where the cost is bounded.
+
+A card carries more than its inputs. Title, description and the **node's identifier**
+share one tinted band — the identifier because it is what a `{{reference}}` resolves
+against, otherwise guessable only from the order you added nodes. That band also holds a
+**✕**, so a node can be removed without first selecting it. Fields label what they accept
+with a **type badge**, mark themselves **required**, and can carry **help text**. And a
+node that declares `outputs` gets a panel beside its body naming every field it emits,
+with a type and a one-line description. That last one matters most: the data contract is
+what you need while wiring, and it's exactly what a node canvas normally hides until you
+connect something and see what happens.
+
+Connections are drawn in the same indigo and carry a **✕ at their midpoint**, so removing
+one is a single click rather than select-then-delete.
 
 Motion: cards pop in on mount, the rail expands on two axes, dialogs scale in, result tiles
 stagger, the Submit button runs a three-dot loader, and buttons depress on `:active`.
@@ -143,8 +174,7 @@ hides below `sm`, the wordmark drops below `xs`, and "Clear all" becomes icon-on
 a chevron toggle replaces hover, and click-to-add replaces dragging — HTML drag-and-drop
 doesn't fire on touch, so tapping is the only way to add a node on a phone. Dragging a node
 *on the canvas* does work on touch, because React Flow drives that with pointer events
-rather than the HTML5 drag API — which is also why the bin hit-tests pointer coordinates in
-`onNodeDrag` instead of listening for a drop event.
+rather than the HTML5 drag API.
 
 *Visual direction is inspired by VectorShift's public product aesthetic. All markup,
 styling, icons, and layout are original; no proprietary assets are used.*
@@ -211,7 +241,7 @@ Fixed along the way, listed because they're easy to miss:
 | `package.json` | **`zustand` was a phantom dependency** — imported by `store.js` but never declared. It resolved only because `reactflow` hoists it. A clean install with a different resolution would break the app. Now declared explicitly. |
 | `inputNode.js`, `outputNode.js`, `textNode.js` | Field values lived only in `useState` and never reached `node.data`, so the submitted pipeline would have shipped without anything the user typed. |
 | `store.js` | `updateNodeField` **mutated** `node.data` and returned the same object reference, so React Flow could skip re-renders. |
-| `store.js` | `getNodeID` read `get().nodeIDs`, which was never initialised in the store. |
+| `store.js` | `getNodeID` read `get().nodeIDs`, which was never initialised in the store. It now derives the next id from the nodes on the canvas instead of a counter, so ids stay compact as nodes come and go. |
 | `ui.js` | `width: '100wv'` — invalid CSS unit, silently ignored. |
 | `ui.js` | `reactFlowInstance.project()` is deprecated. Replaced with `screenToFlowPosition`, which required React Flow ≥ 11.10 — the lockfile pinned 11.8.3 even though `package.json` already allowed `^11.8.3`, so the lock was refreshed to 11.11.4. |
 | `ui.js` | `onDrop`'s dependency array omitted `getNodeID` and `addNode`. |
@@ -239,10 +269,10 @@ making port hover a `box-shadow` halo rather than a `scale()`.
 
 ## Tests
 
-170 tests: 149 frontend (Jest + React Testing Library), 21 backend (pytest).
+207 tests: 186 frontend (Jest + React Testing Library), 21 backend (pytest).
 
 ```
-cd frontend && npm run test:ci     # 149 passed, 14 suites
+cd frontend && npm run test:ci     # 186 passed, 18 suites
 cd backend  && pytest -q           # 21 passed
 ```
 
@@ -283,7 +313,7 @@ See [docs/PERFORMANCE.md](docs/PERFORMANCE.md). Summary:
   doesn't re-render on every drag frame.
 - `nodeTypes` is built once at module scope; variable parsing and text measurement are cached.
 
-Production bundle: **110.6 kB JS + 8.0 kB CSS**, gzipped.
+Production bundle: **113.5 kB JS + 8.0 kB CSS**, gzipped.
 
 ---
 

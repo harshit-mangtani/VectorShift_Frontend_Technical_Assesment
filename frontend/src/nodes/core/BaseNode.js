@@ -1,7 +1,10 @@
 import { useRef } from 'react';
 import clsx from 'clsx';
+import { X } from 'lucide-react';
+import { useStore } from '../../store';
 import { NodeHandle } from './NodeHandle';
-import { nodeCard, categoryChip, categoryTint } from './nodeVariants';
+import { OutputsPanel } from './OutputsPanel';
+import { nodeCard, nodeChip } from './nodeVariants';
 import { useMeasureAfterTransform } from '../../hooks/useMeasureAfterTransform';
 
 const bySide = (handles, side) =>
@@ -9,12 +12,22 @@ const bySide = (handles, side) =>
     (h) => (h.position ?? (h.type === 'target' ? 'left' : 'right')) === side
   );
 
-/** Card shell shared by every node: header, ports, body. */
-export const BaseNode = ({ id, config, handles, selected, size, children }) => {
-  const { label, description, icon: Icon, category } = config;
+/** Card shell shared by every node: header, ports, body, outputs. */
+export const BaseNode = ({
+  id,
+  config,
+  handles,
+  outputs = [],
+  selected,
+  size,
+  children,
+}) => {
+  const { label, description, icon: Icon } = config;
+  const requestDelete = useStore((s) => s.requestDelete);
   const left = bySide(handles, 'left');
   const right = bySide(handles, 'right');
   const width = size?.width ?? 232;
+  const hasOutputs = outputs.length > 0;
 
   // The card is the offset parent of every port, so its transforms distort the
   // measurements React Flow builds edge geometry from.
@@ -22,10 +35,12 @@ export const BaseNode = ({ id, config, handles, selected, size, children }) => {
   useMeasureAfterTransform(id, cardRef);
 
   return (
+    // Width is set on the body column, not the card: with an outputs panel the card is
+    // the sum of the two, and source handles still land on its right edge either way.
     <div
       ref={cardRef}
-      className={clsx('rf-card', nodeCard({ selected }), config.className)}
-      style={{ width, minHeight: size?.minHeight }}
+      className={clsx('rf-card flex', nodeCard({ selected }), config.className)}
+      style={{ minHeight: size?.minHeight }}
     >
       {left.map((handle, i) => (
         <NodeHandle
@@ -46,35 +61,64 @@ export const BaseNode = ({ id, config, handles, selected, size, children }) => {
         />
       ))}
 
-      {!config.bare && (
-        <header
-          className={clsx(
-            'flex items-center gap-2.5 rounded-t-2xl bg-gradient-to-b to-transparent px-3 py-2.5',
-            categoryTint[category]
-          )}
-        >
-          <span
+      <div className="flex min-w-0 flex-col" style={{ width }}>
+        {!config.bare && (
+          // Title, description and identifier share one tinted band, so the card reads as
+          // "what this is" then "what you set".
+          <div
             className={clsx(
-              'flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px]',
-              categoryChip[category]
+              'space-y-1.5 border-b border-brand/10 bg-brand/[0.055] px-2.5 py-2',
+              hasOutputs ? 'rounded-tl-lg' : 'rounded-t-lg'
             )}
           >
-            <Icon size={15} strokeWidth={2.1} />
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-[13px] font-semibold leading-tight tracking-tight">
-              {label}
-            </p>
-            {description && (
-              <p className="truncate text-2xs leading-tight text-muted">{description}</p>
-            )}
-          </div>
-        </header>
-      )}
+            <div className="flex items-start gap-2">
+              <span
+                className={clsx(
+                  'mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-md',
+                  nodeChip
+                )}
+              >
+                <Icon size={13} strokeWidth={2.2} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-semibold leading-tight tracking-tight">
+                  {label}
+                </p>
+                {description && (
+                  <p className="mt-0.5 text-2xs leading-snug text-muted">{description}</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => requestDelete(id)}
+                title="Delete this node"
+                aria-label={`Delete ${label}`}
+                className="nodrag -mr-0.5 shrink-0 rounded-full p-0.5 text-muted/70
+                           transition-colors hover:bg-red-500/10 hover:text-red-500
+                           focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30"
+              >
+                <X size={13} strokeWidth={2.4} />
+              </button>
+            </div>
 
-      <div className={clsx('space-y-2.5 px-3 pb-3', config.bare ? 'pt-3' : 'pt-0.5')}>
-        {children}
+            {/* The id a {{reference}} resolves against — otherwise you have to guess it
+                from the order you added nodes. */}
+            <p
+              className="truncate rounded bg-brand/[0.11] px-2 py-0.5 text-center font-mono
+                         text-[0.6875rem] leading-4 text-ink/80"
+              title={id}
+            >
+              {id}
+            </p>
+          </div>
+        )}
+
+        <div className={clsx('space-y-2 px-2.5 pb-2.5', config.bare ? 'pt-2.5' : 'pt-2')}>
+          {children}
+        </div>
       </div>
+
+      {hasOutputs && <OutputsPanel outputs={outputs} />}
     </div>
   );
 };

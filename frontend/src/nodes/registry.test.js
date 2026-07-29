@@ -14,8 +14,11 @@ describe.each(nodeConfigs.map((c) => [c.type, c]))('%s node', (type, config) => 
     expect(nodeTypes[type]).toBeDefined();
   });
 
+  // Actions are buttons: no key, no value, no label association.
+  const valueFields = (config.fields ?? []).filter((f) => f.type !== 'action');
+
   it('seeds every declared field into node.data', () => {
-    for (const field of config.fields ?? []) {
+    for (const field of valueFields) {
       expect(data).toHaveProperty(field.key);
     }
   });
@@ -29,9 +32,7 @@ describe.each(nodeConfigs.map((c) => [c.type, c]))('%s node', (type, config) => 
 
   it('renders a labelled control for every visible field', () => {
     renderFlow([makeNode(type, id)]);
-    const visible = (config.fields ?? []).filter(
-      (f) => !f.visibleIf || f.visibleIf(data)
-    );
+    const visible = valueFields.filter((f) => !f.visibleIf || f.visibleIf(data));
     for (const field of visible) {
       expect(screen.getByLabelText(field.label)).toBeInTheDocument();
     }
