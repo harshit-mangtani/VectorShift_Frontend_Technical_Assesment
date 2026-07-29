@@ -2,7 +2,6 @@ import { Filter } from 'lucide-react';
 
 const UNARY = ['is_empty', 'is_not_empty'];
 
-// Demonstrates: two source handles, plus a field that appears only for binary operators.
 export const filterConfig = {
   type: 'filter',
   label: 'Filter',

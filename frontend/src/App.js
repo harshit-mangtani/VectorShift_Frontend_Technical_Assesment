@@ -9,8 +9,6 @@ const Workspace = () => {
   const addNode = useAddNode();
 
   return (
-    // No chrome bar: the canvas is the product, so the only two global actions float over
-    // it and everything else lives on the instruments in the opposite corner.
     <div className="relative h-full">
       <main className="absolute inset-0">
         <PipelineUI />

@@ -18,7 +18,6 @@ export const makeNode = (type, id, data) => ({
   data: { ...initialNodeData(type, id), ...data },
 });
 
-/** Renders nodes inside a real React Flow canvas — the only reliable way to mount handles. */
 export const renderFlow = (nodes, edges = []) => {
   useStore.setState({ nodes, edges });
 

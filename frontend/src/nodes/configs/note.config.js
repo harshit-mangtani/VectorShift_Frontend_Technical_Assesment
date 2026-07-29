@@ -28,7 +28,6 @@ const NoteBody = ({ id, data }) => {
   );
 };
 
-// Demonstrates the degenerate case: no handles, no header, fully custom body.
 export const noteConfig = {
   type: 'note',
   label: 'Note',

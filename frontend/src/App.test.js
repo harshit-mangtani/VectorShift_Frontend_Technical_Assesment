@@ -1,6 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { ReactFlowProvider } from 'reactflow';
-import ReactFlow from 'reactflow';
+import ReactFlow, { ReactFlowProvider } from 'reactflow';
 import { SubmitButton } from './submit';
 import { useStore } from './store';
 import { nodeTypes } from './nodes/registry';
@@ -34,33 +33,15 @@ beforeEach(() => {
   );
 });
 
-const submitted = () => JSON.parse(global.fetch.mock.calls[0][1].body);
+it('submits the text just typed, not the previous value', async () => {
+  useStore.setState({ nodes: [makeNode('text', 'text-1', { text: 'old' })] });
+  render(<Workspace />);
 
-describe('typing then submitting immediately', () => {
-  it('sends the text just typed, not the previous value', async () => {
-    useStore.setState({ nodes: [makeNode('text', 'text-1', { text: 'old' })] });
-    render(<Workspace />);
+  fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'brand new' } });
+  // No delay: the debounce is still pending when Submit is clicked.
+  fireEvent.click(screen.getByRole('button', { name: /submit/i }));
 
-    fireEvent.change(screen.getByLabelText('Text'), {
-      target: { value: 'brand new' },
-    });
-    // No delay: the debounce is still pending when Submit is clicked.
-    fireEvent.click(screen.getByRole('button', { name: /submit/i }));
-
-    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
-    expect(submitted().nodes[0].data.text).toBe('brand new');
-  });
-
-  it('sends the edited value of a plain field', async () => {
-    useStore.setState({ nodes: [makeNode('customInput', 'customInput-1')] });
-    render(<Workspace />);
-
-    fireEvent.change(screen.getByLabelText('Name'), {
-      target: { value: 'renamed' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /submit/i }));
-
-    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
-    expect(submitted().nodes[0].data.inputName).toBe('renamed');
-  });
+  await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+  const body = JSON.parse(global.fetch.mock.calls[0][1].body);
+  expect(body.nodes[0].data.text).toBe('brand new');
 });

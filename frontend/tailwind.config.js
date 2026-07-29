@@ -16,14 +16,6 @@ module.exports = {
         line: '#E7E9F2',
         canvas: '#F4F5FB',
         brand: { DEFAULT: '#6366F1', hover: '#5457E5', soft: '#EEF0FE' },
-        // One accent per node category: icon chip, minimap dot, ghost card.
-        cat: {
-          io: '#3B82F6',
-          llm: '#8B5CF6',
-          logic: '#F97316',
-          data: '#06B6D4',
-          utility: '#7C8698',
-        },
       },
       boxShadow: {
         glass: '0 8px 32px -8px rgba(28,33,63,0.14), 0 2px 8px -2px rgba(28,33,63,0.06)',

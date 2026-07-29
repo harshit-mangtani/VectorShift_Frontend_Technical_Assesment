@@ -9,7 +9,7 @@ import { clamp, widestLine } from '../../lib/measureText';
 const MIN_WIDTH = 232;
 const MAX_WIDTH = 460;
 const H_PADDING = 44;
-// One line of the field, and the vertical room each extra port needs beside it.
+
 const LINE_HEIGHT = 34;
 const PORT_SPACING = 22;
 
@@ -29,12 +29,6 @@ const TextEditor = ({ id, data }) => {
 
   const { invalid } = parseVariables(local);
 
-  // Ports need vertical separation, and that room is reserved on the textarea rather
-  // than on the card. Reserving it on the card left the surplus as dead space beneath
-  // the field — space that stayed once it appeared, because it tracked the port count
-  // rather than the text. Here the same room is usable typing area instead.
-  // A CSS min-height also outranks the inline height the autosize hook writes, so the
-  // field can still grow past it but never collapses under it.
   const ports = parseVariables(data.text ?? '').variables.length;
   const reserved = LINE_HEIGHT + Math.max(0, ports - 1) * PORT_SPACING;
 
@@ -70,11 +64,8 @@ export const textConfig = {
   category: 'utility',
   defaultData: { text: '{{input}}' },
   render: TextEditor,
-  // Ports derive from the text itself — the same mechanism any node can opt into.
-  // The id is a positional slot, deliberately independent of the variable name: an id
-  // built from the name would make every rename a remove-and-recreate, which forces
-  // React Flow to re-measure and leaves connections pointing at a handle it has not
-  // measured yet. Renaming now only changes `label`.
+
+  // Positional ids, name as label only: renaming must not recreate the port.
   handles: (data) => [
     ...parseVariables(data.text).variables.map((name, index) => ({
       type: 'target',
@@ -83,8 +74,7 @@ export const textConfig = {
     })),
     { type: 'source', id: 'output' },
   ],
-  // Height is left to the content: the field reserves the room its ports need, so the
-  // card never has to be padded out beyond what it actually shows.
+
   size: (data) => ({ width: textWidth(data.text ?? '') }),
   outputs: [
     { key: 'output', type: 'Text', description: 'The composed text' },

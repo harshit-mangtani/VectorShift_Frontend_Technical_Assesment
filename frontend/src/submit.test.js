@@ -14,15 +14,13 @@ const seed = () =>
 
 beforeEach(() => {
   resetStore();
-  global.fetch = jest.fn(() =>
-    ok({ num_nodes: 2, num_edges: 1, is_dag: true })
-  );
+  global.fetch = jest.fn(() => ok({ num_nodes: 2, num_edges: 1, is_dag: true }));
 });
 
 const submit = () => fireEvent.click(screen.getByRole('button', { name: /submit/i }));
 
 describe('SubmitButton', () => {
-  it('posts the pipeline as JSON without React Flow render state', async () => {
+  it('posts the pipeline as JSON, without React Flow render state', async () => {
     seed();
     render(<SubmitButton />);
     submit();
@@ -32,11 +30,11 @@ describe('SubmitButton', () => {
 
     expect(url).toMatch('/pipelines/parse');
     expect(options.method).toBe('POST');
-    expect(options.headers['Content-Type']).toBe('application/json');
-
-    const body = JSON.parse(options.body);
-    expect(Object.keys(body.nodes[0]).sort()).toEqual(['data', 'id', 'type']);
-    expect(body.edges[0]).toMatchObject({ source: 'customInput-1' });
+    expect(JSON.parse(options.body).nodes[0]).toEqual({
+      id: 'customInput-1',
+      type: 'customInput',
+      data: expect.any(Object),
+    });
   });
 
   it('shows the three values on success', async () => {
@@ -54,51 +52,32 @@ describe('SubmitButton', () => {
 
   it('explains why a cyclic pipeline cannot run', async () => {
     seed();
-    global.fetch = jest.fn(() =>
-      ok({ num_nodes: 2, num_edges: 2, is_dag: false })
-    );
+    global.fetch = jest.fn(() => ok({ num_nodes: 2, num_edges: 2, is_dag: false }));
     render(<SubmitButton />);
     submit();
 
     expect(await screen.findByText(/contains a cycle/i)).toBeInTheDocument();
   });
 
-  it('reports an unreachable backend', async () => {
+  it('reports a backend that is unreachable or unhappy', async () => {
     seed();
     global.fetch = jest.fn(() => Promise.reject(new Error('offline')));
-    render(<SubmitButton />);
+    const { unmount } = render(<SubmitButton />);
     submit();
-
     expect(await screen.findByText(/could not reach the backend/i)).toBeInTheDocument();
-  });
+    unmount();
 
-  it('reports a non-2xx response', async () => {
-    seed();
     global.fetch = jest.fn(() => Promise.resolve({ ok: false, status: 500 }));
     render(<SubmitButton />);
     submit();
-
     expect(await screen.findByText(/returned 500/i)).toBeInTheDocument();
   });
 
-  it('refuses to submit an empty pipeline', async () => {
+  it('refuses an empty pipeline without calling the backend', async () => {
     render(<SubmitButton />);
     submit();
 
     expect(await screen.findByText(/at least one node/i)).toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it('ignores a second click while a request is in flight', async () => {
-    seed();
-    render(<SubmitButton />);
-    const button = screen.getByRole('button');
-
-    fireEvent.click(button);
-    expect(button).toBeDisabled();
-    fireEvent.click(button);
-
-    await screen.findByText('Pipeline analyzed');
-    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 });

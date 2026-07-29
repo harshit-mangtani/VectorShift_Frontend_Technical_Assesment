@@ -4,11 +4,6 @@ import { ChevronsRight, Pin, PinOff, Search } from 'lucide-react';
 import { DraggableNode } from './draggableNode';
 import { toolbarGroups } from './nodes/registry';
 
-/**
- * Collapsed the rail shows icons only. On pointer devices it expands on hover, and the
- * pin — which only exists once expanded — latches it open. Touch devices have no hover,
- * so below `sm` a chevron toggle is always visible instead.
- */
 export const PipelineToolbar = ({ onAdd }) => {
   const [pinned, setPinned] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -19,7 +14,6 @@ export const PipelineToolbar = ({ onAdd }) => {
 
   const open = pinned || hovered || focused;
 
-  // A stale filter would be invisible once the rail closes.
   useEffect(() => {
     if (!open) {
       setQuery('');
@@ -27,21 +21,16 @@ export const PipelineToolbar = ({ onAdd }) => {
     }
   }, [open]);
 
-  // Clicking a button focuses it, and focus alone would hold the rail open long after
-  // the pointer left. Both handlers release it; detail === 0 means keyboard activation,
-  // where focus must stay put.
   const releaseFocus = (event) => {
     setFocused(false);
     if (event.detail > 0) event.currentTarget.blur();
   };
 
-  /** Unpinning hands control back to hover: stay open while inside, close on hover-out. */
   const togglePin = (event) => {
     setPinned((p) => !p);
     if (pinned) releaseFocus(event);
   };
 
-  /** Touch has no hover to fall back on, so the chevron collapses outright. */
   const toggleChevron = (event) => {
     if (!pinned) {
       setPinned(true);
@@ -52,8 +41,6 @@ export const PipelineToolbar = ({ onAdd }) => {
     releaseFocus(event);
   };
 
-  // Freeze the list height on the first keystroke so filtering narrows the results
-  // without the whole rail shrinking around them.
   const search = (value) => {
     if (!query && listRef.current) setLockedHeight(listRef.current.offsetHeight);
     if (!value) setLockedHeight(null);
@@ -71,9 +58,6 @@ export const PipelineToolbar = ({ onAdd }) => {
       .filter((group) => group.configs.length > 0);
   }, [query]);
 
-  // Height cannot animate to `auto`, so collapsible sections use a 0fr→1fr grid row.
-  // Opacity is deliberately quicker than the row: text that lingers at partial height
-  // reads as smeared, whereas fading out first and collapsing after reads as intended.
   const reveal = (children, extra) => (
     <div
       className={clsx(
@@ -101,10 +85,6 @@ export const PipelineToolbar = ({ onAdd }) => {
         open ? 'w-[min(228px,calc(100vw-1rem))]' : 'w-[60px]'
       )}
     >
-      {/* Collapsed on a pointer device this row holds nothing — the chevron is touch-only
-          and the pin only exists once open — so it collapses with its padding rather than
-          leaving a band of empty glass above the icons. Touch keeps it: the chevron is the
-          only way to open the rail there. */}
       <div
         className={clsx(
           'grid shrink-0 rail-ease',
@@ -112,8 +92,6 @@ export const PipelineToolbar = ({ onAdd }) => {
         )}
       >
         <div className="flex min-h-0 items-center justify-between gap-1 overflow-hidden px-2.5 pt-2">
-          {/* Fades rather than shrinking. Animating this width too meant two curves
-              fighting over the same pixels, which is what made the rail stutter. */}
           <span
             className={clsx(
               'field-label overflow-hidden whitespace-nowrap pl-1 rail-ease',
@@ -123,8 +101,7 @@ export const PipelineToolbar = ({ onAdd }) => {
             Nodes
           </span>
 
-          {/* Pointer devices: pin appears only once expanded. */}
-          <button
+            <button
             type="button"
             onClick={togglePin}
             aria-label={pinned ? 'Unpin node library' : 'Keep node library open'}
@@ -142,8 +119,7 @@ export const PipelineToolbar = ({ onAdd }) => {
             {pinned ? <PinOff size={14} /> : <Pin size={14} />}
           </button>
 
-          {/* Touch devices: no hover, so an always-visible toggle. */}
-          <button
+            <button
             type="button"
             onClick={toggleChevron}
             aria-label={open ? 'Collapse node library' : 'Expand node library'}

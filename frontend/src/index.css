@@ -9,9 +9,6 @@
     @apply h-full;
   }
 
-  /* Flat canvas. The corner blooms are gone: they tinted the glass differently depending
-     on where a panel happened to sit, so the same surface read as a different colour in
-     each corner. The dot grid gives the glass enough to refract on its own. */
   body {
     @apply bg-canvas text-ink antialiased;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica,
@@ -20,8 +17,6 @@
 }
 
 @layer components {
-  /* The one place the glass recipe lives: heavy blur, boosted saturation, a bright
-     top edge so the pane reads as a lit sheet rather than a flat tint. */
   .glass {
     @apply border border-white/50 bg-white/30 shadow-glass backdrop-blur-2xl backdrop-saturate-150;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6),
@@ -29,29 +24,23 @@
       0 8px 32px -8px rgba(28, 33, 63, 0.18);
   }
 
-  /* w-fit matters: a label is a click target for its input, so a full-width block
-     would focus the field from anywhere on that row of the card. */
-  /* One curve for everything the node rail animates. A single decelerating ease shared by
-     the width, the reveals and the labels is what stops them arriving at different times
-     and reading as a stutter. */
+  /* One curve for every part of the rail, so they can't arrive at different times. */
   .rail-ease {
     transition-property: width, grid-template-rows, opacity;
     transition-duration: 280ms;
     transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
   }
 
-  /* Reserve the scrollbar's width even when it is absent, so it cannot materialise
-     part-way through the expansion and shove the content sideways. */
+  /* Hold the scrollbar's width so it can't appear mid-animation and shift content. */
   .gutter-stable {
     scrollbar-gutter: stable;
   }
 
+  /* w-fit: a full-width label would focus its input from anywhere on the row. */
   .field-label {
     @apply block w-fit max-w-full text-2xs font-medium tracking-wide text-muted;
   }
 
-  /* Tinted rather than white: node cards are opaque white, so a white field would
-     have nothing but its border to separate it from the card. */
   .field-input {
     @apply w-full rounded-lg border border-line bg-canvas/70 px-2.5 py-1.5 text-sm text-ink
            outline-none transition-all duration-150 placeholder:text-muted/60
@@ -62,17 +51,13 @@
   .field-invalid {
     @apply border-red-300 focus:border-red-400 focus:ring-red-500/10;
   }
-
 }
 
-/* ── React Flow surface ─────────────────────────────────────────────────── */
 .react-flow,
 .react-flow__pane {
   background: transparent;
 }
 
-/* A finished connection is a real thing and reads at full strength; the in-progress line
-   is grey (see connectionLineStyle) so it never looks already-made. */
 .react-flow__edge-path {
   stroke: #6366f1;
   stroke-width: 1.75;
@@ -91,14 +76,10 @@
   box-shadow: 0 1px 3px rgba(28, 33, 63, 0.18);
   transition: box-shadow 0.15s ease, background 0.15s ease;
 }
-/* A halo, not a scale. React Flow reads port positions with getBoundingClientRect, so a
-   transform here would be measured as the port having moved — and it also clobbers the
-   translate(0,-50%) that centres the dot in the first place. */
+/* A halo, not a scale: a transform here would be measured as the port moving. */
 .react-flow__handle:hover {
   box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25), 0 2px 8px rgba(99, 102, 241, 0.45);
 }
-/* One accent for both directions. Which side a port is on already says whether it takes
-   or gives; a second colour saying the same thing is noise. */
 .react-flow__handle-left,
 .react-flow__handle-right {
   background: #6366f1;
@@ -110,8 +91,6 @@
   right: -5px;
 }
 
-/* Glass styling. Layout stays on the element in ui.js as `!` utilities, because it is
-   layout the component owns rather than a theme. */
 .react-flow__controls {
   display: flex;
   gap: 2px;
@@ -122,9 +101,7 @@
   backdrop-filter: blur(16px);
   box-shadow: 0 8px 32px -8px rgba(28, 33, 63, 0.14);
 }
-/* React Flow sizes these content-box at 16px plus 5px of padding. Restated as border-box
-   so the number here is the button you actually see, and CONTROLS_HEIGHT in ui.js can be
-   derived from it. */
+/* border-box so the number here is the button you see, and CONTROLS_HEIGHT can use it. */
 .react-flow__controls-button {
   box-sizing: border-box;
   width: 26px;
@@ -140,8 +117,7 @@
   background: rgba(99, 102, 241, 0.1);
   color: #6366f1;
 }
-/* React Flow's own control icons are solid shapes; ours are lucide strokes, which this
-   rule would flood-fill. The stroke attribute is what tells them apart. */
+/* React Flow's icons are solid, ours are lucide strokes: fill only the former. */
 .react-flow__controls-button svg:not([stroke]) {
   fill: currentColor;
 }
@@ -150,16 +126,10 @@
   border-radius: 12px;
 }
 
-/* Node cards deliberately skip backdrop-blur: there can be hundreds of them, and
-   each blurred layer is a separate compositing pass. Chrome gets the real glass. */
+/* On .rf-card, never .react-flow__node — that one is positioned by transform. */
 .rf-card {
   transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease,
     opacity 0.2s ease, border-color 0.2s ease;
-  /* Mount animation lives on the card, never on .react-flow__node: React Flow positions
-     nodes with `transform: translate()`, and an animated transform overrides inline
-     styles — with fill-mode it persists, collapsing every node onto the pane origin.
-     Scaling the card displaces its ports as far as getBoundingClientRect is concerned;
-     useMeasureAfterTransform re-reads them once this settles. */
   animation: cardIn 0.22s cubic-bezier(0.34, 1.2, 0.64, 1);
 }
 
@@ -174,7 +144,6 @@
   }
 }
 
-/* Scrollbars inside glass panels. */
 .thin-scroll::-webkit-scrollbar {
   width: 6px;
 }

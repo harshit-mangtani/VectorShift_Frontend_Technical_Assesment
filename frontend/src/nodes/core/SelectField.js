@@ -2,14 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { Check, ChevronDown } from 'lucide-react';
 
-/**
- * Native <option> elements accept almost no styling in any browser — no radius, no
- * padding, no hover state — so the list is rendered as a real listbox instead.
- * Keeps label association, keyboard control and ARIA semantics.
- *
- * Arrow keys move a highlight only; nothing is written until Enter, so browsing the
- * list never mutates node data.
- */
 const HANDLED = new Set([
   'ArrowDown',
   'ArrowUp',
@@ -30,15 +22,10 @@ export const SelectField = ({ id, options, value, onChange, invalid, ...aria }) 
     options.findIndex((o) => o.value === value)
   );
   const [active, setActive] = useState(selectedIndex);
-  // The keyboard highlight is a persistent bit of state; mouse hover is not. Tracking
-  // which input last moved the cursor lets hover stay pure CSS, so it clears the moment
-  // the pointer leaves instead of leaving a stuck highlight behind.
+
   const [keyNav, setKeyNav] = useState(false);
   const current = options[selectedIndex];
 
-  // Capture phase, not bubble: React Flow's pane runs on d3-zoom, which calls
-  // stopImmediatePropagation() when a pan begins — a bubble-phase listener would never
-  // see a click on the canvas. pointerdown covers touch; mousedown is the fallback.
   useEffect(() => {
     if (!open) return undefined;
     const onDown = (e) => {
@@ -52,7 +39,6 @@ export const SelectField = ({ id, options, value, onChange, invalid, ...aria }) 
     };
   }, [open]);
 
-  // Keep the highlighted row in view when navigating a long list.
   useEffect(() => {
     if (!open) return;
     list.current?.children[active]?.scrollIntoView?.({ block: 'nearest' });
@@ -89,8 +75,6 @@ export const SelectField = ({ id, options, value, onChange, invalid, ...aria }) 
   }, []);
 
   const onKeyDown = (e) => {
-    // React Flow binds Enter/Space on the node wrapper to select the node, and arrows
-    // to nudge it. Anything this listbox handles must not reach it.
     if (HANDLED.has(e.key)) e.stopPropagation();
 
     switch (e.key) {
@@ -123,7 +107,7 @@ export const SelectField = ({ id, options, value, onChange, invalid, ...aria }) 
         else openList(true);
         break;
       case 'Escape':
-        // Discard the highlight; the committed value is untouched.
+
         setOpen(false);
         break;
       case 'Tab':
@@ -188,8 +172,7 @@ export const SelectField = ({ id, options, value, onChange, invalid, ...aria }) 
                   'flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2.5 py-1.5',
                   'text-sm transition-colors duration-100',
                   isSelected && 'bg-brand-soft font-medium text-brand',
-                  // Keyboard highlight is stateful; mouse hover is left to CSS so it
-                  // disappears as soon as the pointer moves away.
+
                   !isSelected && isActive && keyNav && 'bg-brand/[0.06]',
                   !isSelected && 'text-ink hover:bg-brand/[0.04]'
                 )}

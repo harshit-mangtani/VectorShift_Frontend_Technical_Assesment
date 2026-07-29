@@ -4,7 +4,6 @@ const TIMEOUT_MS = 10000;
 export class ApiError extends Error {}
 export class NetworkError extends Error {}
 
-/** Strips React Flow's render state so the backend contract stays explicit and small. */
 export const toPipelinePayload = (nodes, edges) => ({
   nodes: nodes.map(({ id, type, data }) => ({ id, type, data })),
   edges: edges.map(({ id, source, target, sourceHandle, targetHandle }) => ({

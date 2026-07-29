@@ -1,7 +1,5 @@
 import { Webhook } from 'lucide-react';
 
-// Demonstrates: a source-only node. Every other type has something feeding it; a trigger
-// starts the pipeline, so it declares no target handles at all and the layout adapts.
 export const webhookConfig = {
   type: 'webhook',
   label: 'Webhook',

@@ -20,7 +20,6 @@ const validJson = (value) => {
   }
 };
 
-// Demonstrates: per-field validation across three different field types.
 export const apiRequestConfig = {
   type: 'apiRequest',
   label: 'API Request',

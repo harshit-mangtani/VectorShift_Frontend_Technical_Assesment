@@ -25,14 +25,12 @@ import { ConfirmDialog } from './components/ConfirmDialog';
 const GRID = 20;
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 2;
-// Four 26px buttons, three 2px gaps, 3px of padding each side (see index.css) — the
-// minimap matches it so the corner reads as one cluster, not two stacked objects.
+
 const CONTROLS_HEIGHT = 4 * 26 + 3 * 2 + 6;
 const DELETE_KEY = 'Delete';
 const proOptions = { hideAttribution: true };
 const minimapColor = () => ACCENT;
 
-// Backspace inside a field means "erase a character", never "delete the node".
 const isTyping = (el) =>
   !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
 
@@ -66,16 +64,9 @@ export const PipelineUI = () => {
   const selectedEdge = edges.find((edge) => edge.selected);
   const pending = nodes.find((node) => node.id === pendingDeleteId);
 
-  // React Flow's own deleteKeyCode removes the selection outright, so it is turned off and
-  // handled here instead: a node is confirmed first, a connection is not — it costs one
-  // drag to redraw, and a dialog for that is friction rather than safety.
-  //
-  // Delete only, never Backspace. Backspace is an editing key before it is a destructive
-  // one, and binding it canvas-wide means a stray press outside a field costs a node.
+  // React Flow's deleteKeyCode deletes outright; a node needs confirming first.
   useEffect(() => {
     const onKeyDown = (event) => {
-      // event.target, not activeElement: the key was delivered to whatever had focus, and
-      // that is the thing entitled to consume it.
       if (event.key !== DELETE_KEY || isTyping(event.target)) return;
 
       if (selected) requestDelete(selected.id);
@@ -111,8 +102,7 @@ export const PipelineUI = () => {
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
-  // React Flow's own fit uses the whole pane, which tucks nodes under the floating
-  // chrome. This frames them into what is actually visible instead.
+  // React Flow fits to the whole pane, which parks nodes under the floating chrome.
   const fitToFreeSpace = useCallback(() => {
     const pane = paneRef.current?.getBoundingClientRect();
     const viewport =
@@ -122,8 +112,6 @@ export const PipelineUI = () => {
     else fitView({ duration: 300 });
   }, [nodes, setViewport, fitView]);
 
-  // Locking the canvas is three separate React Flow flags; the control presents them as
-  // one, which is how a user thinks about it.
   const toggleLock = useCallback(() => {
     const next = !flowStore.getState().nodesDraggable;
     flowStore.setState({
@@ -167,7 +155,6 @@ export const PipelineUI = () => {
           size={1.4}
           color="#C2C8DC"
         />
-        {/* overflow-hidden so the map's square svg is clipped to the rounded glass. */}
         <MiniMap
           pannable
           zoomable
@@ -179,8 +166,6 @@ export const PipelineUI = () => {
                      !border-white/70 !bg-white/55 !shadow-glass !backdrop-blur-xl sm:!block"
         />
 
-        {/* Canvas instruments, laid out beside the minimap; on mobile the minimap is
-            hidden and the row takes the corner itself. */}
         <Panel
           position="bottom-right"
           className="!bottom-4 !right-4 !m-0 flex items-end gap-2 sm:!right-[13.25rem]"
@@ -229,8 +214,6 @@ export const PipelineUI = () => {
       )}
 
       {pending && (
-        // Named by id, not by type: with three LLM nodes on the canvas, "LLM will be
-        // removed" doesn't tell you which one you are about to lose.
         <ConfirmDialog
           title="Delete this node?"
           message={`${configByType[pending.type]?.label ?? pending.type} “${pending.id}”

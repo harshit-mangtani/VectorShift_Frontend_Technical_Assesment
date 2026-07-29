@@ -9,15 +9,11 @@ afterEach(resetStore);
 describe.each(nodeConfigs.map((c) => [c.type, c]))('%s node', (type, config) => {
   const id = `${type}-1`;
   const data = initialNodeData(type, id);
-
-  it('is registered for React Flow', () => {
-    expect(nodeTypes[type]).toBeDefined();
-  });
-
   // Actions are buttons: no key, no value, no label association.
   const valueFields = (config.fields ?? []).filter((f) => f.type !== 'action');
 
   it('seeds every declared field into node.data', () => {
+    expect(nodeTypes[type]).toBeDefined();
     for (const field of valueFields) {
       expect(data).toHaveProperty(field.key);
     }
@@ -32,8 +28,7 @@ describe.each(nodeConfigs.map((c) => [c.type, c]))('%s node', (type, config) => 
 
   it('renders a labelled control for every visible field', () => {
     renderFlow([makeNode(type, id)]);
-    const visible = valueFields.filter((f) => !f.visibleIf || f.visibleIf(data));
-    for (const field of visible) {
+    for (const field of valueFields.filter((f) => !f.visibleIf || f.visibleIf(data))) {
       expect(screen.getByLabelText(field.label)).toBeInTheDocument();
     }
   });

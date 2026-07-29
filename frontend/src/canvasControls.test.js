@@ -4,14 +4,18 @@ import { PipelineUI } from './ui';
 import { useStore } from './store';
 import { makeNode, resetStore } from './testUtils';
 
-// React Flow's own store, reached the way a component would.
 let flowApi;
 const Probe = () => {
   flowApi = useStoreApi();
   return null;
 };
 
-const canvas = () =>
+beforeEach(() => {
+  resetStore();
+  useStore.setState({ nodes: [makeNode('llm', 'llm-1')] });
+});
+
+it('the lock freezes dragging, connecting and selecting together, and releases them', () => {
   render(
     <ReactFlowProvider>
       <div style={{ width: 800, height: 600 }}>
@@ -20,45 +24,16 @@ const canvas = () =>
       </div>
     </ReactFlowProvider>
   );
-
-beforeEach(() => {
-  resetStore();
-  useStore.setState({ nodes: [makeNode('llm', 'llm-1')] });
-});
-
-describe('canvas lock', () => {
   const lock = () => screen.getByRole('button', { name: /(lock|unlock) canvas/i });
 
-  it('starts unlocked', () => {
-    canvas();
-    expect(lock()).toHaveAccessibleName('Lock canvas');
-    expect(lock()).toHaveAttribute('aria-pressed', 'false');
+  fireEvent.click(lock());
+  expect(flowApi.getState()).toMatchObject({
+    nodesDraggable: false,
+    nodesConnectable: false,
+    elementsSelectable: false,
   });
+  expect(lock()).toHaveAccessibleName('Unlock canvas');
 
-  it('freezes dragging, connecting and selecting together', () => {
-    canvas();
-    fireEvent.click(lock());
-
-    expect(flowApi.getState()).toMatchObject({
-      nodesDraggable: false,
-      nodesConnectable: false,
-      elementsSelectable: false,
-    });
-  });
-
-  it('reports its state, and releases everything again', () => {
-    canvas();
-
-    fireEvent.click(lock());
-    expect(lock()).toHaveAccessibleName('Unlock canvas');
-    expect(lock()).toHaveAttribute('aria-pressed', 'true');
-
-    fireEvent.click(lock());
-    expect(flowApi.getState()).toMatchObject({
-      nodesDraggable: true,
-      nodesConnectable: true,
-      elementsSelectable: true,
-    });
-    expect(lock()).toHaveAccessibleName('Lock canvas');
-  });
+  fireEvent.click(lock());
+  expect(flowApi.getState()).toMatchObject({ nodesDraggable: true });
 });

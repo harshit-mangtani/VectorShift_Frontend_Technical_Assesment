@@ -1,32 +1,23 @@
 import { Info } from 'lucide-react';
 import { TypeBadge } from './TypeBadge';
 
-// What each control accepts, shown as a badge so the node's shape is readable without
-// clicking into it. `badge: null` in a config opts out.
 const BADGE = {
   text: 'Text',
   textarea: 'Text',
   number: 'Number',
   password: 'Secret',
   select: 'Dropdown',
-  // checkbox and toggle carry none: the control already says it is a yes/no.
 };
 
 export const badgeFor = (field) =>
   field.badge === undefined ? BADGE[field.type] : field.badge;
 
-/**
- * Label row for one field: name, required marker, help, and the type badge.
- *
- * Everything except the name sits *outside* the <label>, so the control's accessible
- * name stays exactly `field.label` — `getByLabelText(label)` has to keep working, and a
- * screen reader shouldn't read "Endpoint star info Text".
- */
 export const FieldLabel = ({ field, htmlFor, helpId }) => {
   const badge = badgeFor(field);
 
   return (
     <div className="flex items-center gap-1">
+      {/* Only the name goes inside <label>, so the accessible name stays exact. */}
       <label className="field-label" htmlFor={htmlFor}>
         {field.label}
       </label>
@@ -37,15 +28,8 @@ export const FieldLabel = ({ field, htmlFor, helpId }) => {
         </span>
       )}
 
-      {/* The tooltip is built rather than left to the `title` attribute: lucide renders an
-          <svg>, and a title *attribute* on an SVG element does not reliably produce a
-          tooltip — SVG expects a <title> child — so the help text was silently invisible.
-          A styled bubble also appears immediately instead of after the UA's ~1s delay.
-
-          Two copies of the string: the bubble is aria-hidden, and the sr-only span is what
-          aria-describedby points at. A display-toggled bubble would be unreachable to a
-          screen reader at the moment the control is focused. */}
       {field.help && (
+        // A title attribute on an <svg> does not render a tooltip; SVG wants <title>.
         <span className="group/help relative inline-flex shrink-0">
           <Info
             size={11}

@@ -1,8 +1,6 @@
 import clsx from 'clsx';
 import { Spline, Waypoints } from 'lucide-react';
 
-// Icon and label both report the shape currently in use, so the tooltip changes with it
-// rather than reading the same either way.
 const SHAPE = {
   straight: { Icon: Waypoints, label: 'Straight Connections' },
   curved: { Icon: Spline, label: 'Curved Connections' },

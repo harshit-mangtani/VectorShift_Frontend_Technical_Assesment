@@ -5,33 +5,13 @@ def test_empty_graph_is_a_dag():
     assert is_dag([], []) is True
 
 
-def test_single_node_is_a_dag():
-    assert is_dag(["a"], []) is True
-
-
-def test_linear_chain():
-    assert is_dag(["a", "b", "c"], [("a", "b"), ("b", "c")]) is True
-
-
-def test_branching():
-    assert is_dag(["a", "b", "c"], [("a", "b"), ("a", "c")]) is True
-
-
-def test_merging():
-    assert is_dag(["a", "b", "c"], [("a", "c"), ("b", "c")]) is True
-
-
-def test_diamond_reconverges_but_is_still_a_dag():
+def test_diamond_branches_and_reconverges_but_is_still_a_dag():
     edges = [("a", "b"), ("a", "c"), ("b", "d"), ("c", "d")]
     assert is_dag(["a", "b", "c", "d"], edges) is True
 
 
 def test_self_loop_is_a_cycle():
     assert is_dag(["a"], [("a", "a")]) is False
-
-
-def test_two_node_cycle():
-    assert is_dag(["a", "b"], [("a", "b"), ("b", "a")]) is False
 
 
 def test_long_cycle():

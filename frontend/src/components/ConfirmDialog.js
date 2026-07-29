@@ -18,8 +18,6 @@ export const ConfirmDialog = ({
     return () => document.removeEventListener('keydown', onKey);
   }, [onCancel]);
 
-  // Portalled to <body>: `backdrop-filter` on an ancestor (the glass header) makes it a
-  // containing block for `position: fixed`, which would centre this inside the header.
   return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-ink/25 p-4 backdrop-blur-sm"

@@ -1,13 +1,5 @@
 import clsx from 'clsx';
 
-/**
- * A button on the card. `run` receives the node's data and a `set(key, value)` bound to
- * that node, so an action edits the node it sits on and nothing else.
- *
- * Deliberately not a hook for arbitrary side effects: a config that could reach anywhere
- * would make node behaviour unreviewable, and there is no pipeline runtime here for it to
- * reach into anyway.
- */
 export const ActionField = ({ field, data, set }) => {
   const { icon: Icon, label, tone } = field;
 

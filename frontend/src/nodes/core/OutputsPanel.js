@@ -19,14 +19,6 @@ const Row = ({ output }) => (
   </li>
 );
 
-/**
- * What a node emits, beside its inputs. The pipeline's data contract is the thing you
- * most need while wiring and the thing a canvas normally hides, so it is stated on the
- * card rather than left to be discovered by connecting something and seeing what happens.
- *
- * Rarely-read fields are declared `advanced` and start collapsed, so the common case
- * stays short.
- */
 export const OutputsPanel = ({ outputs }) => {
   const [open, setOpen] = useState(false);
   const primary = outputs.filter((output) => !output.advanced);
@@ -55,13 +47,8 @@ export const OutputsPanel = ({ outputs }) => {
         <span>Type</span>
       </div>
 
-      {/* Outputs can be derived from a field, so the list has no bound the config
-          controls — JSON Parse grows one row per key. Cap it and scroll rather than let
-          one node stretch the canvas.
-
-          `nowheel` is React Flow's opt-out: without it the pane swallows the wheel to
-          zoom, and the only way to move the list is to drag its scrollbar. */}
-      <ul className="nowheel thin-scroll max-h-52 overflow-y-auto border-t border-line">
+      {/* nowheel: the pane swallows the wheel to zoom without it. */}
+        <ul className="nowheel thin-scroll max-h-52 overflow-y-auto border-t border-line">
         {primary.map((output) => (
           <Row key={output.key} output={output} />
         ))}

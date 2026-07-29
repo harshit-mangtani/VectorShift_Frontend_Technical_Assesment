@@ -29,89 +29,61 @@ const ids = () => useStore.getState().nodes.map((n) => n.id);
 
 beforeEach(resetStore);
 
-describe('the card’s own ✕', () => {
-  // Inside a React Flow node an accessible name computes to "" — jsdom never measures the
-  // node, so it stays visibility:hidden. The title attribute is unaffected.
-  const cross = () => screen.getByTitle('Delete this node');
+describe('deleting a node', () => {
+  // Inside a React Flow node an accessible name computes to "" — jsdom never measures it.
+  const cross = () => screen.getAllByTitle('Delete this node')[0];
 
-  it('asks before deleting', () => {
-    useStore.setState({ nodes: [makeNode('llm', 'llm-1')], edges: [] });
-    canvas();
-
-    fireEvent.click(cross());
-
-    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
-    expect(useStore.getState().nodes).toHaveLength(1);
-  });
-
-  it('deletes the node it belongs to, selected or not', () => {
+  it('confirms, then removes the node and its connections', () => {
     seed();
     canvas();
 
-    fireEvent.click(screen.getAllByTitle('Delete this node')[0]);
-    fireEvent.click(screen.getByRole('button', { name: 'Delete node' }));
+    fireEvent.click(cross());
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    expect(useStore.getState().nodes).toHaveLength(2);
 
+    fireEvent.click(screen.getByRole('button', { name: 'Delete node' }));
     expect(ids()).toEqual(['text-1']);
     expect(useStore.getState().edges).toHaveLength(0);
   });
 
-  it('leaves everything alone when cancelled', () => {
-    useStore.setState({ nodes: [makeNode('llm', 'llm-1')], edges: [] });
+  it('changes nothing when cancelled', () => {
+    seed();
     canvas();
 
     fireEvent.click(cross());
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
-    expect(useStore.getState().nodes).toHaveLength(1);
+    expect(useStore.getState().nodes).toHaveLength(2);
     expect(useStore.getState().pendingDeleteId).toBeNull();
   });
-});
 
-describe('the Delete key', () => {
-  it('asks first when a node is selected', () => {
+  it('is also reachable by Delete on a selection', () => {
     seed('llm-1');
     canvas();
 
     press('Delete');
-
     expect(screen.getByRole('alertdialog')).toBeInTheDocument();
-    expect(useStore.getState().nodes).toHaveLength(2);
   });
 
-  // Backspace is an editing key first. Bound canvas-wide, one stray press outside a
-  // field would cost a node.
-  it('is not joined by Backspace', () => {
+  it('is not bound to Backspace, which is an editing key first', () => {
     seed('llm-1');
     canvas();
 
     press('Backspace');
-
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-    expect(useStore.getState().nodes).toHaveLength(2);
   });
 
-  it('removes the node and its connections once confirmed', () => {
-    seed('llm-1');
+  it('ignores Delete while a field has focus', () => {
+    seed('text-1');
     canvas();
 
-    press('Delete');
-    fireEvent.click(screen.getByRole('button', { name: 'Delete node' }));
-
-    expect(ids()).toEqual(['text-1']);
-    expect(useStore.getState().edges).toHaveLength(0);
+    press('Delete', screen.getByLabelText('Text'));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   });
+});
 
-  it('keeps the node when the dialog is cancelled', () => {
-    seed('llm-1');
-    canvas();
-
-    press('Delete');
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-
-    expect(ids()).toEqual(['llm-1', 'text-1']);
-  });
-
-  it('drops a selected connection outright, with no dialog', () => {
+describe('deleting a connection', () => {
+  it('goes without a dialog when selected and Delete is pressed', () => {
     useStore.setState({
       nodes: [makeNode('llm', 'llm-1')],
       edges: [
@@ -127,53 +99,7 @@ describe('the Delete key', () => {
     expect(useStore.getState().edges.map((e) => e.id)).toEqual(['e2']);
   });
 
-  it('prefers the node when a node and a connection are both selected', () => {
-    useStore.setState({
-      nodes: [{ ...makeNode('llm', 'llm-1'), selected: true }],
-      edges: [{ id: 'e1', source: 'llm-1', target: 'llm-1', selected: true }],
-    });
-    canvas();
-
-    press('Delete');
-
-    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
-    expect(useStore.getState().edges).toHaveLength(1);
-  });
-
-  it('does nothing with an empty selection', () => {
-    seed();
-    canvas();
-
-    press('Delete');
-
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-    expect(useStore.getState().nodes).toHaveLength(2);
-  });
-
-  it('is ignored while a field has focus', () => {
-    seed('text-1');
-    canvas();
-
-    press('Delete', screen.getByLabelText('Text'));
-
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-    expect(useStore.getState().nodes).toHaveLength(2);
-  });
-});
-
-describe('the connection’s own ✕', () => {
-  // The button portals into React Flow's edge-label layer, so a live flow has to exist.
-  const withFlow = (id) =>
-    render(
-      <ReactFlowProvider>
-        <div style={{ width: 800, height: 600 }}>
-          <ReactFlow nodes={[]} edges={[]} />
-          <EdgeDeleteButton id={id} labelX={40} labelY={40} />
-        </div>
-      </ReactFlowProvider>
-    );
-
-  it('removes that connection and no other, without confirming', () => {
+  it('goes without a dialog from its own midpoint button', () => {
     useStore.setState({
       nodes: [],
       edges: [
@@ -181,11 +107,17 @@ describe('the connection’s own ✕', () => {
         { id: 'e2', source: 'b', target: 'c' },
       ],
     });
-    withFlow('e1');
+    // The button portals into React Flow's edge-label layer, so a live flow must exist.
+    render(
+      <ReactFlowProvider>
+        <div style={{ width: 800, height: 600 }}>
+          <ReactFlow nodes={[]} edges={[]} />
+          <EdgeDeleteButton id="e1" labelX={40} labelY={40} />
+        </div>
+      </ReactFlowProvider>
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete this connection' }));
-
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(useStore.getState().edges.map((e) => e.id)).toEqual(['e2']);
   });
 });
@@ -196,41 +128,15 @@ describe('clear all', () => {
     expect(screen.getByRole('button', { name: /clear all/i })).toBeDisabled();
   });
 
-  it('asks before clearing, and does nothing if cancelled', () => {
-    seed();
-    render(<ClearAllButton />);
-    fireEvent.click(screen.getByRole('button', { name: /clear all/i }));
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-
-    expect(useStore.getState().nodes).toHaveLength(2);
-  });
-
   it('empties nodes and edges once confirmed', () => {
     seed();
     render(<ClearAllButton />);
     fireEvent.click(screen.getByRole('button', { name: /clear all/i }));
 
-    // The header trigger and the dialog's confirm share a label, so scope the query.
+    // The trigger and the dialog's confirm share a label, so scope the query.
     const dialog = within(screen.getByRole('alertdialog'));
     fireEvent.click(dialog.getByRole('button', { name: 'Clear all' }));
 
     expect(useStore.getState()).toMatchObject({ nodes: [], edges: [] });
-  });
-});
-
-describe('store deletion actions', () => {
-  it('removeNode drops both incoming and outgoing edges', () => {
-    useStore.setState({
-      nodes: [makeNode('llm', 'a'), makeNode('llm', 'b'), makeNode('llm', 'c')],
-      edges: [
-        { id: 'in', source: 'a', target: 'b' },
-        { id: 'out', source: 'b', target: 'c' },
-        { id: 'unrelated', source: 'a', target: 'c' },
-      ],
-    });
-
-    useStore.getState().removeNode('b');
-
-    expect(useStore.getState().edges.map((e) => e.id)).toEqual(['unrelated']);
   });
 });

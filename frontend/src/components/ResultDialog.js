@@ -15,7 +15,6 @@ const Stat = ({ label, value, index }) => (
   </div>
 );
 
-/** The alert required by Part 4, as a focus-trapped dialog rather than window.alert. */
 export const ResultDialog = ({ result, error, onClose }) => {
   const closeRef = useRef(null);
 
@@ -28,8 +27,6 @@ export const ResultDialog = ({ result, error, onClose }) => {
 
   const isDag = result?.is_dag;
 
-  // Portalled for the same reason as ConfirmDialog: the glass header's backdrop-filter
-  // would otherwise become the containing block for this fixed overlay.
   return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-ink/25 p-4 backdrop-blur-sm"

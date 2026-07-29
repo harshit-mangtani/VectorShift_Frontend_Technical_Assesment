@@ -9,7 +9,6 @@ import { webhookConfig } from './configs/webhook.config';
 import { jsonParseConfig } from './configs/jsonParse.config';
 import { noteConfig } from './configs/note.config';
 
-// Adding a node type: write a config, add it here. Nothing else in the app changes.
 export const nodeConfigs = [
   inputConfig,
   outputConfig,
@@ -26,7 +25,6 @@ export const configByType = Object.fromEntries(
   nodeConfigs.map((config) => [config.type, config])
 );
 
-// Built once at module scope — React Flow rebuilds its internals if this identity changes.
 export const nodeTypes = Object.fromEntries(
   nodeConfigs.map((config) => [config.type, createNode(config)])
 );
@@ -46,12 +44,11 @@ export const toolbarGroups = CATEGORY_ORDER.map((category) => ({
   configs: nodeConfigs.filter((config) => config.category === category),
 })).filter((group) => group.configs.length > 0);
 
-/** Seeds node.data from the config's defaults so no value lives only in component state. */
 export const initialNodeData = (type, id) => {
   const config = configByType[type];
   const data = { id, nodeType: type, ...config.defaultData };
   for (const field of config.fields ?? []) {
-    if (!field.key) continue; // an action is a button, not a value
+    if (!field.key) continue;
     data[field.key] =
       typeof field.defaultValue === 'function'
         ? field.defaultValue(id)

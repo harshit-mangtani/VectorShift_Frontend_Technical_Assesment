@@ -8,14 +8,10 @@ import { ActionField } from './ActionField';
 import { FieldLabel } from './FieldLabel';
 
 const DEBOUNCED = new Set(['text', 'textarea', 'number', 'password']);
-// Controls that sit beside their label rather than under it.
+
 const INLINE = new Set(['checkbox', 'toggle']);
 const isBlank = (value) => value === '' || value === null || value === undefined;
 
-/**
- * Renders one FieldConfig against node.data. Free-text inputs debounce their commit;
- * discrete controls (select, checkbox, toggle) commit immediately.
- */
 export const Field = memo(({ nodeId, field, data, value }) => {
   const inputId = useId();
   const helpId = `${inputId}-help`;
@@ -26,7 +22,6 @@ export const Field = memo(({ nodeId, field, data, value }) => {
     [updateNodeField, nodeId, field.key]
   );
 
-  // Actions own no value, so they take the whole node and a setter instead.
   const setKey = useCallback(
     (key, next) => updateNodeField(nodeId, key, next),
     [updateNodeField, nodeId]
@@ -103,7 +98,7 @@ export const Field = memo(({ nodeId, field, data, value }) => {
     );
 
   // A switch or tick reads as one statement with its label, so it shares the row; a value
-  // control needs the width and takes the line below.
+
   return inline ? (
     <div className="flex items-center justify-between gap-2">
       <FieldLabel field={field} htmlFor={inputId} helpId={helpId} />

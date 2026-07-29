@@ -1,7 +1,5 @@
 import '@testing-library/jest-dom';
 
-// React Flow measures the DOM on mount; jsdom reports zero for everything, so these
-// stubs are what make any canvas render testable at all.
 global.ResizeObserver = class {
   observe() {}
   unobserve() {}
@@ -25,5 +23,4 @@ Object.defineProperties(global.HTMLElement.prototype, {
 
 global.SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 0, height: 0 });
 
-// Canvas is unavailable in jsdom; measureText falls back to a character estimate.
 global.HTMLCanvasElement.prototype.getContext = () => null;

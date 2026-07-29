@@ -1,6 +1,5 @@
 import clsx from 'clsx';
 
-/** The lavender type pill used on field labels and in the outputs table. */
 export const TypeBadge = ({ children, className }) => (
   <span
     className={clsx(

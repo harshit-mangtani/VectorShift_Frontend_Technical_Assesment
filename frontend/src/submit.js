@@ -15,9 +15,9 @@ export const SubmitButton = () => {
   const onSubmit = useCallback(async () => {
     if (pending) return;
 
-    // Debounced edits must land before we read state, or we submit stale data.
+    // Debounced edits must land before the graph is read, or we submit stale data.
     flushPending();
-    // Read non-reactively: this button has no reason to re-render as the graph changes.
+
     const { nodes, edges } = useStore.getState();
 
     if (nodes.length === 0) {
@@ -43,9 +43,6 @@ export const SubmitButton = () => {
 
   return (
     <>
-      {/* The graph is read once, at click time. Letting it be edited mid-flight would
-          produce an answer about a pipeline that no longer exists, so the canvas is
-          sealed until the response lands. Portalled to escape any stacking context. */}
       {pending &&
         createPortal(
           <div
@@ -60,10 +57,10 @@ export const SubmitButton = () => {
         onClick={onSubmit}
         disabled={pending}
         aria-busy={pending}
-        className="inline-flex h-9 items-center gap-2 rounded-xl bg-gradient-to-br from-brand
-                   to-cat-llm px-3.5 text-sm font-medium text-white shadow-card
-                   transition-all duration-200 hover:shadow-lift hover:brightness-105
-                   active:scale-[.97] disabled:cursor-not-allowed disabled:opacity-70
+        className="inline-flex h-9 items-center gap-2 rounded-xl bg-brand px-3.5 text-sm
+                   font-medium text-white shadow-card transition-all duration-200
+                   hover:bg-brand-hover hover:shadow-lift active:scale-[.97]
+                   disabled:cursor-not-allowed disabled:opacity-70
                    focus:outline-none focus-visible:ring-4 focus-visible:ring-brand/25"
       >
         {pending ? <LoadingDots /> : <Play size={14} strokeWidth={2.4} />}

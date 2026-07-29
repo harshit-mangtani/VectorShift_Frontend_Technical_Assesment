@@ -1,7 +1,6 @@
 const VARIABLE = /\{\{\s*([^{}]*?)\s*\}\}/g;
 const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
-// Reserved words can't be JavaScript variable names, so they can't be handles either.
 const RESERVED = new Set([
   'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default',
   'delete', 'do', 'else', 'enum', 'export', 'extends', 'false', 'finally',
@@ -15,10 +14,6 @@ const isValid = (name) => IDENTIFIER.test(name) && !RESERVED.has(name);
 const cache = new Map();
 const CACHE_LIMIT = 50;
 
-/**
- * Extracts `{{ variable }}` names from text, in first-appearance order, deduped.
- * @returns {{variables: string[], invalid: string[]}}
- */
 export const parseVariables = (text = '') => {
   if (cache.has(text)) return cache.get(text);
 

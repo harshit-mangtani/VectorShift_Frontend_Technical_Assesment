@@ -11,63 +11,36 @@ const edges = [
 
 afterEach(resetStore);
 
-describe('edge shape', () => {
-  it('routes through the trimmed edge when straight', () => {
-    expect(shapeEdges(edges, 'straight').map((e) => e.type)).toEqual([
-      'trimmed',
-      'trimmed',
-    ]);
-  });
-
-  it('routes through the bezier edge when curved', () => {
-    expect(shapeEdges(edges, 'curved').map((e) => e.type)).toEqual([
-      'curved',
-      'curved',
-    ]);
-  });
-
-  it('re-routes connections that are already on the canvas', () => {
-    const straight = shapeEdges(edges, 'straight');
-    expect(shapeEdges(straight, 'curved').map((e) => e.type)).toEqual([
-      'curved',
-      'curved',
-    ]);
-  });
-
-  it('leaves an already-correct edge untouched, so nothing re-renders', () => {
-    const once = shapeEdges(edges, 'straight');
-    const twice = shapeEdges(once, 'straight');
-
-    expect(twice[0]).toBe(once[0]);
-    expect(twice[1]).toBe(once[1]);
-  });
-
-  it('starts straight and flips on each toggle', () => {
-    expect(useStore.getState().edgeShape).toBe('straight');
-    useStore.getState().toggleEdgeShape();
-    expect(useStore.getState().edgeShape).toBe('curved');
-    useStore.getState().toggleEdgeShape();
-    expect(useStore.getState().edgeShape).toBe('straight');
-  });
+it('stamps the shape on at render, so the toggle re-routes existing connections', () => {
+  const straight = shapeEdges(edges, 'straight');
+  expect(straight.map((e) => e.type)).toEqual(['trimmed', 'trimmed']);
+  expect(shapeEdges(straight, 'curved').map((e) => e.type)).toEqual(['curved', 'curved']);
 });
 
-describe('edge shape toggle', () => {
-  const renderToggle = (shape, onToggle = () => {}) =>
-    render(<EdgeShapeToggle shape={shape} onToggle={onToggle} />);
+it('passes an already-correct edge through by identity, so nothing re-renders', () => {
+  const once = shapeEdges(edges, 'straight');
+  const twice = shapeEdges(once, 'straight');
+  expect(twice[0]).toBe(once[0]);
+});
 
-  it('names the shape in use', () => {
-    const { rerender } = renderToggle('straight');
-    expect(screen.getByRole('button')).toHaveAccessibleName('Straight Connections');
+it('starts straight and flips on each toggle', () => {
+  expect(useStore.getState().edgeShape).toBe('straight');
+  useStore.getState().toggleEdgeShape();
+  expect(useStore.getState().edgeShape).toBe('curved');
+  useStore.getState().toggleEdgeShape();
+  expect(useStore.getState().edgeShape).toBe('straight');
+});
 
-    rerender(<EdgeShapeToggle shape="curved" onToggle={() => {}} />);
-    expect(screen.getByRole('button')).toHaveAccessibleName('Curved Connections');
-  });
+it('names the shape in use, and asks for the other when pressed', () => {
+  const onToggle = jest.fn();
+  const { rerender } = render(
+    <EdgeShapeToggle shape="straight" onToggle={onToggle} />
+  );
+  expect(screen.getByRole('button')).toHaveAccessibleName('Straight Connections');
 
-  it('asks for the other shape when pressed', () => {
-    const onToggle = jest.fn();
-    renderToggle('straight', onToggle);
+  fireEvent.click(screen.getByRole('button'));
+  expect(onToggle).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole('button', { name: /straight connections/i }));
-    expect(onToggle).toHaveBeenCalledTimes(1);
-  });
+  rerender(<EdgeShapeToggle shape="curved" onToggle={onToggle} />);
+  expect(screen.getByRole('button')).toHaveAccessibleName('Curved Connections');
 });

@@ -1,340 +1,213 @@
 # Pipeline Builder — VectorShift Frontend Assessment
 
-A node-based workflow builder: React + React Flow on the front end, FastAPI on the back.
-Drag nodes onto the canvas, wire them together, and submit the pipeline to be analysed
-for node/edge counts and whether it forms a DAG.
+A node-based workflow builder. React + React Flow on the front, FastAPI on the back. Drag
+nodes onto the canvas, wire them up, hit Submit, and the backend tells you how many nodes
+and edges you have and whether it's a DAG.
 
----
-
-## Quickstart
+## Running it
 
 Two terminals.
 
 ```bash
-# 1 — frontend  →  http://localhost:3000
-cd frontend
-npm i
-npm start
+cd frontend && npm i && npm start     # → localhost:3000
+cd backend  && pip install -r requirements.txt && uvicorn main:app --reload
 ```
 
-```bash
-# 2 — backend   →  http://localhost:8000
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload
-```
-
-The frontend targets `http://localhost:8000` by default; override with
-`REACT_APP_API_URL` if needed.
-
-### Commands
+The frontend points at `http://localhost:8000`; override with `REACT_APP_API_URL`.
 
 | | |
 |---|---|
-| `npm start` | dev server |
-| `npm run build` | production build |
-| `npm test` | frontend tests (watch) |
-| `npm run test:ci` | frontend tests once, with coverage |
+| `npm start` / `npm run build` | dev server / production build |
+| `npm test` / `npm run test:ci` | tests, watch / once with coverage |
 | `npm run lint` | ESLint |
-| `pytest` | backend tests (from `backend/`) |
+| `pytest` | backend tests, from `backend/` |
+
+## Using it
+
+Pick a node from the rail on the left — drag it, or click to drop one in the middle. Drag
+right port → left port to connect. Edit fields on the card.
+
+- **Delete a node**: the ✕ on its card, or select it and press <kbd>Delete</kbd>. Both ask
+  first. **Delete a connection**: the ✕ at its midpoint, or select and <kbd>Delete</kbd> —
+  no confirmation, it's one drag to redraw.
+- **Connection shape** toggles straight ↔ curved, and re-routes what's already there.
+- **Fit view** frames the graph into the space the floating chrome leaves free.
+- **Lock** freezes dragging, connecting and selecting in one switch.
+- **Clear all** (top right) empties the canvas, behind a confirmation.
+
+More in [docs/FEATURES.md](docs/FEATURES.md).
 
 ---
 
-## Using the builder
+## The four parts
 
-1. Pick a node from the left library — **drag** it onto the canvas, or **click** it to
-   drop one in the centre.
-2. Drag from a node's right-hand port to another node's left-hand port to connect them.
-3. Edit fields directly on the card.
-4. Remove a node with the **✕ on its card**, or select it and press <kbd>Delete</kbd>.
-   Both confirm first. A *connection* never does, since it's trivial to redraw — click the
-   **✕ at its midpoint**, or select and press <kbd>Delete</kbd>.
-5. Switch connections between **straight and curved** with the toggle by the zoom bar. It
-   re-routes what's already on the canvas, not just new connections.
-6. **Fit view** frames the whole pipeline into the space the floating chrome leaves free,
-   rather than under it.
-7. **Clear all**, top-right, empties the canvas — also behind a confirmation. **Lock**,
-   in the zoom bar, freezes dragging, connecting and selecting in one switch.
-8. Hit **Submit** to analyse the pipeline.
+### 1 — Node abstraction
 
-A fuller tour, with the reasoning behind each behaviour, is in
-[docs/FEATURES.md](docs/FEATURES.md).
-
----
-
-## How each part was addressed
-
-### Part 1 — Node abstraction
-
-A node type is **one config object**. Nothing else in the app changes when you add one.
+A node type is **one config object**. Nothing else changes when you add one.
 
 ```js
-// nodes/configs/myNode.config.js
-import { Sparkles } from 'lucide-react';
-
-export const myNodeConfig = {
-  type: 'myNode',
-  label: 'My Node',
-  description: 'What it does',
+export const scoreConfig = {
+  type: 'score',
+  label: 'Score',
+  description: 'Rate an input 0–1',
   icon: Sparkles,
   category: 'logic',
   fields: [
-    { key: 'mode', type: 'select', label: 'Mode', defaultValue: 'fast', required: true,
-      help: 'Precise costs more but scores better.',
-      options: [{ label: 'Fast', value: 'fast' }, { label: 'Precise', value: 'precise' }] },
+    { key: 'threshold', type: 'number', label: 'Threshold', required: true,
+      help: 'Rows below this are dropped.', defaultValue: 0.5 },
   ],
-  handles: [
-    { type: 'target', id: 'in' },
-    { type: 'source', id: 'out' },
-  ],
-  outputs: [
-    { key: 'score', type: 'Decimal', description: 'Confidence, 0–1' },
-    { key: 'latency_ms', type: 'Integer', description: 'Time taken', advanced: true },
-  ],
+  handles: [{ type: 'target', id: 'in' }, { type: 'source', id: 'out' }],
+  outputs: [{ key: 'score', type: 'Decimal', description: 'Confidence, 0–1' }],
 };
 ```
 
-Add it to the array in [`nodes/registry.js`](frontend/src/nodes/registry.js) and it is
-registered with React Flow, listed in the toolbar under its category, coloured by its
-accent, draggable, click-to-addable, seeded into `node.data`, and covered by the existing
-test suite. That's the whole process — see [docs/NODE_ABSTRACTION.md](docs/NODE_ABSTRACTION.md)
-for the full schema.
+Add it to the array in [`nodes/registry.js`](frontend/src/nodes/registry.js) and it's
+registered with React Flow, grouped in the toolbar, draggable, click-to-addable, seeded into
+`node.data`, and covered by the existing tests. Full schema in
+[docs/NODE_ABSTRACTION.md](docs/NODE_ABSTRACTION.md).
 
-The second half of the requirement — *applying styles across nodes* — is
-[`nodes/core/nodeVariants.js`](frontend/src/nodes/core/nodeVariants.js). One `cva()` call
-owns card appearance for every node type; editing it restyles all nine.
+The *apply styles across nodes* half is
+[`nodes/core/nodeVariants.js`](frontend/src/nodes/core/nodeVariants.js) — one `cva()` call
+owns every card.
 
-**The five new nodes** were chosen for coverage rather than plausibility, since the brief
-asks for a demonstration of the abstraction's flexibility. Each buys a capability the
-other four don't:
+**The five new nodes** were picked for coverage, not plausibility. Each buys something the
+others don't:
 
-| Node | What it proves the abstraction can do |
+| Node | What it proves |
 |---|---|
-| **Filter** | Two source handles, plus a field that appears only for binary operators (`visibleIf`) |
-| **API Request** | Per-field validation across three field types, plus `required` and `help` |
-| **Webhook** | A source-only node — no target handles at all, and the layout adapts |
+| **Filter** | Two source handles, plus a field that only shows for binary operators |
+| **API Request** | Validation across three field types, plus `required` and `help` |
+| **Webhook** | Source-only — no target handles at all, and the layout copes |
 | **JSON Parse** | Ports *and* declared outputs both derived from one field's value |
 | **Note** | The degenerate case: no handles, no header, fully custom body |
 
-Earlier drafts also had a Transform node and a Database node. Both were cut on the same
-test: Transform re-stated the Text node's `{{variable}}` mechanism, and Database's
-select-driven topology is the narrow case of what JSON Parse already shows. A node that
-duplicates a capability adds surface without adding evidence.
+Transform and Database nodes existed at one point and were cut: Transform restated the Text
+node's `{{variable}}` trick, and Database's select-driven topology is the narrow case of
+what JSON Parse already shows. Duplicating a capability adds surface, not evidence.
 
-### Part 2 — Styling
+### 2 — Styling
 
-A minimal glassmorphic interface built on a semantic token layer in
-[`tailwind.config.js`](frontend/tailwind.config.js). A fixed three-point radial wash
-(indigo / violet / cyan over a near-white canvas) gives the glass something to refract;
-chrome surfaces — node rail, dialogs, minimap, and the bottom-right instrument row
-(connection-shape toggle, vertical zoom bar) — share one `.glass` recipe of translucent
-white, a light border and `backdrop-blur-xl`. Chrome keeps the softer 12–16px radii; node
-cards sit at 8px, which reads as denser and more instrument-like at canvas scale.
+**Flat, dense and light**, on a semantic token layer in
+[`tailwind.config.js`](frontend/tailwind.config.js). Opaque white cards on a pale grey
+dotted canvas, hairline `#E7E9F2` borders, small radii — 8px on cards and the rail, 12px on
+buttons and canvas instruments, 16px on dialogs — and two soft shadows: `card` at rest,
+`lift` on hover and selection. Type is small and tight:
+13px titles, 11px labels, monospace for ids and output fields.
 
-**There is no header.** The canvas is the product, so the only two global actions float
-over it in one corner and every canvas instrument sits in the other. Everything between
-belongs to the pipeline.
+**One accent**, indigo `#6366F1` — ports, connections, badges, the submit button, and the
+same hue at 5% behind a card's title band. An earlier pass gave each category its own colour;
+five hues across a dense canvas is noise, not information, since the icon already says what a
+node is. Category now drives grouping and ordering only. The one place colour carries meaning
+is connections: grey while you're dragging one out, indigo once it exists.
 
-**One accent, everywhere.** An earlier pass gave each category its own hue. Five colours
-competing across a dense canvas read as noise rather than information — the icon already
-says what a node is — so category now drives grouping and ordering only, and indigo does
-the rest. The one place colour still carries meaning is connections: **grey while you are
-dragging one out, indigo once it exists**, so an in-progress link never looks finished.
+Cards are fully opaque; only the four surfaces that float *over* the graph — the node rail,
+dialogs, the minimap and the instrument row — blur what's behind them, so the pipeline stays
+visible underneath.
 
-**Node cards deliberately skip `backdrop-blur`.** Each blurred layer is its own compositing
-pass, and a canvas can hold hundreds of nodes; they are opaque white with a tinted title
-band instead — which also means overlapping cards never show through one another. Real
-glass is reserved for the handful of chrome surfaces, where the cost is bounded.
+**No header bar.** The canvas is the product, so the two global actions float in one corner
+and the canvas instruments sit in the other.
 
-A card carries more than its inputs. Title, description and the **node's identifier**
-share one tinted band — the identifier because it is what a `{{reference}}` resolves
-against, otherwise guessable only from the order you added nodes. That band also holds a
-**✕**, so a node can be removed without first selecting it. Fields label what they accept
-with a **type badge**, mark themselves **required**, and can carry **help text**. And a
-node that declares `outputs` gets a panel beside its body naming every field it emits,
-with a type and a one-line description. That last one matters most: the data contract is
-what you need while wiring, and it's exactly what a node canvas normally hides until you
-connect something and see what happens.
+**Density over decoration.** A card states more than its inputs: the node's **id** (what a
+`{{reference}}` resolves against), a **✕**, **type badges**, **required** markers, **help**
+tooltips, and — when the config declares `outputs` — a panel naming every field it emits.
 
-Connections are drawn in the same indigo and carry a **✕ at their midpoint**, so removing
-one is a single click rather than select-then-delete.
+**Responsive** to ~320px. The rail caps its width, the minimap hides below `sm`, "Clear all"
+goes icon-only, and a chevron replaces hover on touch. Dragging nodes on the canvas still
+works on touch because React Flow uses pointer events, not the HTML5 drag API.
 
-Motion: cards pop in on mount, the rail expands on two axes, dialogs scale in, result tiles
-stagger, the Submit button runs a three-dot loader, and buttons depress on `:active`.
-Everything is suppressed under `prefers-reduced-motion`.
+*Visual direction is drawn from a VectorShift product demo video on YouTube — the flat
+cards, the tinted title band, the id pill, the outputs panel and the type badges all follow
+what the product does. All markup, styling, icons and layout are original.*
 
-The node library is a **floating rail** — detached from the window edge, rounded, shadowed.
-Collapsed it shows icons only; it expands in both axes on hover, on keyboard focus, or when
-pinned with the chevron. Width animates directly; the search field and group headings expand
-via a `grid-rows-[0fr] → [1fr]` transition, so the rail's height animates smoothly rather
-than snapping. Labels stay mounted while collapsed so every item keeps its accessible name.
+### 3 — Text node
 
-**Responsive** down to ~320px: the rail caps its expanded width to the viewport, the minimap
-hides below `sm`, the wordmark drops below `xs`, and "Clear all" becomes icon-only. On touch
-a chevron toggle replaces hover, and click-to-add replaces dragging — HTML drag-and-drop
-doesn't fire on touch, so tapping is the only way to add a node on a phone. Dragging a node
-*on the canvas* does work on touch, because React Flow drives that with pointer events
-rather than the HTML5 drag API.
-
-*Visual direction is inspired by VectorShift's public product aesthetic. All markup,
-styling, icons, and layout are original; no proprietary assets are used.*
-
-### Part 3 — Text node
-
-- The single-line input is now a textarea that **grows in both dimensions** — height from
-  `scrollHeight`, width from the widest line measured on a shared canvas context — clamped
-  to sane bounds, scrolling beyond the maximum rather than growing forever.
-- `{{variable}}` names create left-hand target handles, in first-appearance order, deduped,
-  validated as real JavaScript identifiers (reserved words rejected). Invalid names produce
-  an inline warning instead of vanishing silently.
-- **Handle IDs are positional (`in-0`, `in-1`, …), not derived from the variable name.**
-  An ID built from the name turns every rename into a remove-and-recreate, which drops the
-  connection and leaves React Flow with an unmeasured port. Renaming now changes only the
-  label; the wire survives.
-- The parser is a standalone, independently tested utility:
+- The input is a textarea that **grows in both dimensions** — height from `scrollHeight`,
+  width from the widest line measured on a shared canvas context — clamped, then scrolls.
+- `{{variable}}` names become left-hand ports, in first-appearance order, deduped, validated
+  as real JS identifiers (reserved words rejected). Invalid names get an inline warning
+  rather than vanishing.
+- **Port ids are positional (`in-0`, `in-1`), not the variable name.** An id built from the
+  name makes every rename a remove-and-recreate, which drops the connection and leaves React
+  Flow with an unmeasured port. Renaming now only changes the label.
+- The parser is standalone and separately tested:
   [`lib/parseVariables.js`](frontend/src/lib/parseVariables.js).
 
-### Part 4 — Backend integration
+### 4 — Backend
 
-`POST /pipelines/parse` returns exactly `{num_nodes, num_edges, is_dag}`. Cycle detection
-is **iterative Kahn's algorithm** (O(V+E)) — iterative rather than recursive DFS so a deep
-pipeline can't exhaust the stack. [`submit.js`](frontend/src/submit.js) posts the graph and
-opens a result dialog.
+`POST /pipelines/parse` returns exactly `{num_nodes, num_edges, is_dag}`. Cycle detection is
+**iterative Kahn's** (O(V+E)) — iterative so a deep pipeline can't blow the stack.
+[`submit.js`](frontend/src/submit.js) posts the graph and opens the result.
 
-**On "create an alert":** this is implemented as a styled, focus-trapped dialog rather than
-`window.alert`, because the brief asks for the values to be shown "in a user-friendly
-manner". It is the required alert — three stat tiles plus a plain-English explanation of
-what the DAG result means.
-
----
-
-## Architecture
-
-```
-Drag / click  →  useAddNode  →  Zustand store  →  React Flow  →  Submit
-                      │                                            │
-              initialNodeData()                              flushPending()
-              (defaults from config)                    then POST /pipelines/parse
-```
-
-- **`nodes/registry.js`** — the single source of truth. Toolbar, `nodeTypes`, minimap
-  colours, and tests all derive from it.
-- **`nodes/core/createNode.js`** — turns a config into a memoized React Flow component.
-- **`store.js`** — Zustand. All node data is immutable; editing one node leaves every other
-  node's object identity intact.
-
-| Doc | Covers |
-|---|---|
-| [docs/FEATURES.md](docs/FEATURES.md) | Every behaviour in the app and the reasoning behind it |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layout, build setup, data flow, store contract, the API contract |
-| [docs/NODE_ABSTRACTION.md](docs/NODE_ABSTRACTION.md) | The full config schema and how to add a node type |
-| [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | What was optimised, what was measured, what was rejected |
-
----
-
-## Bugs found in the starter code
-
-Fixed along the way, listed because they're easy to miss:
-
-| Where | Problem |
-|---|---|
-| `package.json` | **`zustand` was a phantom dependency** — imported by `store.js` but never declared. It resolved only because `reactflow` hoists it. A clean install with a different resolution would break the app. Now declared explicitly. |
-| `inputNode.js`, `outputNode.js`, `textNode.js` | Field values lived only in `useState` and never reached `node.data`, so the submitted pipeline would have shipped without anything the user typed. |
-| `store.js` | `updateNodeField` **mutated** `node.data` and returned the same object reference, so React Flow could skip re-renders. |
-| `store.js` | `getNodeID` read `get().nodeIDs`, which was never initialised in the store. It now derives the next id from the nodes on the canvas instead of a counter, so ids stay compact as nodes come and go. |
-| `ui.js` | `width: '100wv'` — invalid CSS unit, silently ignored. |
-| `ui.js` | `reactFlowInstance.project()` is deprecated. Replaced with `screenToFlowPosition`, which required React Flow ≥ 11.10 — the lockfile pinned 11.8.3 even though `package.json` already allowed `^11.8.3`, so the lock was refreshed to 11.11.4. |
-| `ui.js` | `onDrop`'s dependency array omitted `getNodeID` and `addNode`. |
-| `llmNode.js` | Handle offsets hand-tuned as `100/3` / `200/3` per node. Now distributed automatically. |
-| `main.py` | A `GET` endpoint declaring a `Form(...)` body — could not work as written. |
-
-Two more that neither the brief nor the starter code hints at, both in React Flow itself:
-
-**It does not delete edges when a handle disappears.** Deleting `{{input}}` from a Text
-node left a live edge pointing at a port that no longer existed, inflating `num_edges` and
-potentially reporting a false cycle. `pruneEdges` in the store fixes it, and it's covered
-by tests.
-
-**It measures port positions with `getBoundingClientRect()` — which includes CSS
-transforms — but only re-measures on a `ResizeObserver`, which a transform never fires.**
-A port read while its card is mid-animation is therefore recorded in the wrong place, by a
-fraction of the card's own width, and nothing ever corrects it. Since every card runs a
-220 ms entrance scale, this made arrowhead spacing differ per node type and shift as a
-Text node grew — the error is proportional to card width, and the Text node is the only
-one whose width varies. Fixed by re-measuring once a card's transform settles
-([`useMeasureAfterTransform`](frontend/src/hooks/useMeasureAfterTransform.js)) and by
-making port hover a `box-shadow` halo rather than a `scale()`.
-
----
-
-## Tests
-
-207 tests: 186 frontend (Jest + React Testing Library), 21 backend (pytest).
-
-```
-cd frontend && npm run test:ci     # 186 passed, 18 suites
-cd backend  && pytest -q           # 21 passed
-```
-
-Highlights:
-
-- **`nodes/registry.test.js`** loops over every registered config and asserts each one
-  renders, exposes exactly its declared handle IDs, seeds its fields into `node.data`, and
-  gives every visible field a real label. One test protecting all nine node types — and the
-  evidence that the abstraction is real rather than asserted.
-- **`nodes/textNode.test.js`** covers variable handles appearing, deduping, being rejected
-  when invalid, and — the important one — disappearing *along with their edges*.
-- **`App.test.js`** types into a field and submits with no intervening delay, proving the
-  debounce is flushed and the request carries the value just typed, not the previous one.
-- **`nodes/textNode.test.js`** also pins the rename guarantee directly: renaming a variable
-  — longer, shorter, or one of several — must leave the handle IDs and the edge list byte
-  for byte identical.
-- **`lib/fitViewport.test.js`** projects the graph's bounding box through the computed
-  viewport and asserts it clears every inset, rather than asserting the arithmetic it just
-  performed.
-- **`hooks/useMeasureAfterTransform.test.js`** covers the re-measure firing on
-  `animationend`, ignoring transitions that can't move a port, and — the one that matters —
-  refusing to measure a card that is still transformed.
-- **`backend/test_dag.py`** covers empty, single, linear, branching, merging, diamond,
-  self-loop, 2-cycle, long cycle, a cycle in one of two disconnected components, duplicate
-  edges, edges referencing unknown nodes, and a 10,000-node graph.
+**On "create an alert":** it's a styled, focus-trapped dialog rather than `window.alert`,
+because the brief asks for the values "in a user-friendly manner". Three stat tiles and a
+plain-English reading of the DAG result. The canvas is sealed behind a scrim while the
+request is in flight — the graph is read once, at click time, so letting it be edited
+mid-flight would answer a question about a pipeline that no longer exists.
 
 ---
 
 ## Performance
 
-See [docs/PERFORMANCE.md](docs/PERFORMANCE.md). Summary:
-
-- Keystrokes stay in local state and commit to the store on a debounce, so typing no longer
-  re-renders the whole graph — then get flushed before submit so nothing is lost.
+- Keystrokes stay in local state and commit on a debounce, so typing doesn't re-render the
+  graph — then get flushed before submit so nothing is lost.
 - Node components are memoized on `data`/`selected` only. **Position is excluded** — React
-  Flow moves nodes with a CSS transform, so bodies don't need to re-render during a drag.
-- The Submit button reads state via `useStore.getState()` rather than subscribing, so it
-  doesn't re-render on every drag frame.
-- `nodeTypes` is built once at module scope; variable parsing and text measurement are cached.
+  Flow moves nodes with a CSS transform, so bodies needn't re-render during a drag.
+- Submit reads state via `useStore.getState()` rather than subscribing, so it doesn't
+  re-render on every drag frame.
+- `nodeTypes` and `edgeTypes` are built once at module scope; variable parsing and text
+  measurement are cached.
+- `updateNodeField` replaces only the edited node, so every other node keeps its identity
+  and the memo actually holds.
 
-Production bundle: **113.5 kB JS + 8.0 kB CSS**, gzipped.
+Production bundle: **113.4 kB JS + 7.9 kB CSS**, gzipped.
 
----
+## Tests
+
+120: 106 frontend (Jest + RTL), 14 backend (pytest).
+
+```
+cd frontend && npm run test:ci     # 106 passed, 15 suites
+cd backend  && pytest -q           # 14 passed
+```
+
+Worth knowing:
+
+- **`registry.test.js`** loops every registered config and asserts it renders, exposes its
+  declared handle ids, seeds its fields, and labels every visible control. One test covering
+  all nine node types — and the evidence the abstraction is real rather than claimed.
+- **`textNode.test.js`** covers variable ports appearing, deduping, being rejected when
+  invalid, disappearing *with their edges* — and renaming leaving the handle ids and edge
+  list byte-for-byte identical.
+- **`App.test.js`** types into a field and submits with no delay, proving the debounce is
+  flushed and the request carries what was just typed.
+- **`fitViewport.test.js`** projects the graph's bounding box through the computed viewport
+  and checks it clears every inset, rather than re-asserting the arithmetic. Its "no room to
+  frame" case derives from `CHROME`, so retuning the insets can't quietly make it a test of
+  nothing.
+- **`test_dag.py`** covers empty, diamond, self-loop, long cycle, a cycle in one of two
+  disconnected components, duplicate edges, edges referencing unknown nodes, and a
+  10,000-node graph.
+
+Deliberately not tested: anything that would only exercise React Flow. `TrimmedEdge`'s
+geometry tests went when `GAP` became `0` — they had quietly reduced to asserting that
+`getSmoothStepPath` ends where you tell it to.
+
+## Docs
+
+| | |
+|---|---|
+| [docs/FEATURES.md](docs/FEATURES.md) | What everything does, and why |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layout, build setup, store contract, API contract |
+| [docs/NODE_ABSTRACTION.md](docs/NODE_ABSTRACTION.md) | Config schema, and how to add a node |
 
 ## Known limitations
 
-- No persistence — reloading clears the canvas.
-- No undo/redo.
-- Light theme only. Tokens are semantic, so dark mode is a token swap, but it isn't wired up.
-- Field validation is advisory: an invalid URL shows an error but doesn't block submission.
-- Responsive to ~320px, but a node canvas is inherently cramped on a phone; laptop and
-  desktop are the intended targets.
+- No persistence, no undo/redo. Reloading clears the canvas.
+- Light theme only. Tokens are semantic, so dark mode is a token swap, but it isn't wired.
+- Field validation is advisory — an invalid URL warns but doesn't block submission.
+- Nothing executes a pipeline. `outputs` declares the data contract; it doesn't run it.
 - `npm i` reports ~66 audit advisories. Every one traces to `react-scripts@5.0.1`'s
-  build-time dependency tree — Create React App is unmaintained, so its transitives are
-  frozen (e.g. the high-severity `postcss@7.0.39` comes via `resolve-url-loader` ←
-  `react-scripts`; the project's own postcss is 8.5.23). None of it reaches the production
-  bundle, and no runtime dependency is affected. `npm audit fix --force` "resolves" them by
-  installing the placeholder `react-scripts@0.0.0`, which destroys the build — the only
-  real remedy is migrating off CRA, which would break the `npm i` / `npm start` workflow
-  the assessment specifies.
-
-## With another day
-
-Pipeline save/load to `localStorage`, undo/redo via a Zustand middleware, per-node
-execution status, and a Playwright end-to-end pass over the drag → connect → submit flow.
+  build-time tree — CRA is unmaintained, so its transitives are frozen. None reach the
+  production bundle. `npm audit fix --force` "fixes" them by installing
+  `react-scripts@0.0.0`, which destroys the build; the only real remedy is migrating off
+  CRA, which would break the `npm i` / `npm start` workflow the brief specifies.

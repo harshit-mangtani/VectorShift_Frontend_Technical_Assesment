@@ -12,7 +12,6 @@ const bySide = (handles, side) =>
     (h) => (h.position ?? (h.type === 'target' ? 'left' : 'right')) === side
   );
 
-/** Card shell shared by every node: header, ports, body, outputs. */
 export const BaseNode = ({
   id,
   config,
@@ -29,14 +28,11 @@ export const BaseNode = ({
   const width = size?.width ?? 232;
   const hasOutputs = outputs.length > 0;
 
-  // The card is the offset parent of every port, so its transforms distort the
-  // measurements React Flow builds edge geometry from.
+  // The card is every port's offset parent, so its transforms skew their measurement.
   const cardRef = useRef(null);
   useMeasureAfterTransform(id, cardRef);
 
   return (
-    // Width is set on the body column, not the card: with an outputs panel the card is
-    // the sum of the two, and source handles still land on its right edge either way.
     <div
       ref={cardRef}
       className={clsx('rf-card flex', nodeCard({ selected }), config.className)}
@@ -61,10 +57,9 @@ export const BaseNode = ({
         />
       ))}
 
+      {/* Width sits on the body column: with an outputs panel the card is the sum. */}
       <div className="flex min-w-0 flex-col" style={{ width }}>
         {!config.bare && (
-          // Title, description and identifier share one tinted band, so the card reads as
-          // "what this is" then "what you set".
           <div
             className={clsx(
               'space-y-1.5 border-b border-brand/10 bg-brand/[0.055] px-2.5 py-2',
@@ -101,9 +96,7 @@ export const BaseNode = ({
               </button>
             </div>
 
-            {/* The id a {{reference}} resolves against — otherwise you have to guess it
-                from the order you added nodes. */}
-            <p
+              <p
               className="truncate rounded bg-brand/[0.11] px-2 py-0.5 text-center font-mono
                          text-[0.6875rem] leading-4 text-ink/80"
               title={id}

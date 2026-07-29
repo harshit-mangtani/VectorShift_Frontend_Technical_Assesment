@@ -1,6 +1,5 @@
 import { useLayoutEffect } from 'react';
 
-/** Grows a textarea to fit its content, up to `max`, then lets it scroll. */
 export const useAutosizeHeight = (ref, value, max = 280) => {
   useLayoutEffect(() => {
     const el = ref.current;

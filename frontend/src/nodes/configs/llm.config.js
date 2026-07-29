@@ -5,8 +5,6 @@ const DEFAULTS = {
   prompt: 'Answer the question using {{context}}.',
 };
 
-// Demonstrates: a long-form node — two textareas, a switch, a secret revealed by a
-// tickbox, and an action that writes back to several of its own fields at once.
 export const llmConfig = {
   type: 'llm',
   label: 'LLM',

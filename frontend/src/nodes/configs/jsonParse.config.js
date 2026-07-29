@@ -7,8 +7,6 @@ const keysOf = (value) =>
     .filter(Boolean)
     .filter((key, index, all) => all.indexOf(key) === index);
 
-// Demonstrates: `outputs` driven by data, the same way `handles` already is — and on the
-// source side, so the ports the user wires *out of* are the ones they declared.
 export const jsonParseConfig = {
   type: 'jsonParse',
   label: 'JSON Parse',
@@ -55,7 +53,7 @@ export const jsonParseConfig = {
   ],
   handles: (data) => [
     { type: 'target', id: 'json' },
-    // Positional ids, name carried as the label — see the note in text.config.js.
+
     ...keysOf(data.keys).map((key, index) => ({
       type: 'source',
       id: `out-${index}`,
